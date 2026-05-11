@@ -1,0 +1,23 @@
+{
+  "name": "hot-potato-react-demo",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "scripts": {
+    "assets": "node scripts/generate-assets.mjs",
+    "predev": "node scripts/generate-assets.mjs",
+    "dev": "vite --configLoader native --host 127.0.0.1",
+    "prebuild": "node scripts/generate-assets.mjs",
+    "build": "vite build --configLoader native",
+    "preview": "vite preview --configLoader native --host 127.0.0.1"
+  },
+  "dependencies": {
+    "@vitejs/plugin-react": "^5.0.4",
+    "react": "^19.1.1",
+    "react-dom": "^19.1.1",
+    "vite": "^7.1.9"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.59.1"
+  }
+}
