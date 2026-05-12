@@ -4,19 +4,23 @@ const socialTable = "social_potatoes";
 const playersTable = "players";
 
 function envConfig() {
-  const url = process.env.SUPABASE_URL;
-  const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  const url = (process.env.SUPABASE_URL || "").trim();
+  const serviceRoleKey = (process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SECRET_KEY || "").trim();
   if (!url || !serviceRoleKey) {
     return { configured: false, reason: "SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY are required." };
   }
   return { configured: true, url: url.replace(/\/+$/, ""), serviceRoleKey };
 }
 
+function isLegacyJwtKey(key) {
+  return key.split(".").length === 3;
+}
+
 function headers(serviceRoleKey, prefer) {
   return {
     apikey: serviceRoleKey,
-    authorization: `Bearer ${serviceRoleKey}`,
     "content-type": "application/json",
+    ...(isLegacyJwtKey(serviceRoleKey) ? { authorization: `Bearer ${serviceRoleKey}` } : {}),
     ...(prefer ? { prefer } : {})
   };
 }
@@ -24,6 +28,30 @@ function headers(serviceRoleKey, prefer) {
 export function backendStatus() {
   const config = envConfig();
   return { configured: config.configured, reason: config.reason || "" };
+}
+
+export async function checkBackendHealth() {
+  const config = envConfig();
+  if (!config.configured) {
+    return { ok: false, configured: false, reason: config.reason || "Supabase is not configured." };
+  }
+
+  const params = new URLSearchParams({
+    select: "id",
+    limit: "1"
+  });
+  const response = await fetch(`${config.url}/rest/v1/${playersTable}?${params}`, {
+    headers: headers(config.serviceRoleKey)
+  });
+  if (response.ok) {
+    return { ok: true, configured: true, reason: "" };
+  }
+  const body = await response.json().catch(() => null);
+  return {
+    ok: false,
+    configured: true,
+    reason: body?.message || body?.hint || "Supabase rejected the player directory request."
+  };
 }
 
 export async function createSocialPotato(record) {
