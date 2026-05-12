@@ -63,6 +63,7 @@ const initialGame = {
   quickPassChain: 0,
   babyHandsRounds: 0,
   fundClicks: 0,
+  sacToPileClicks: 0,
   walletBurnNonce: 0,
   pendingPower: "",
   pendingPowerStreak: 0,
@@ -1888,7 +1889,6 @@ export default function App() {
 
   function fundRisk() {
     clearFx();
-    playSfx("fund");
     if (game.tots >= SPUD.riskFundTots && !game.potato) animateSpudToPile("fundRisk");
     setGame((old) => {
       if (old.tots < SPUD.riskFundTots || old.potato) {
@@ -1896,19 +1896,12 @@ export default function App() {
         showToast(old.potato ? "Wait until your hands are empty." : `Need ${SPUD.riskFundTots} Tots.`);
         return old;
       }
+      playSfx("fund");
       const fundClicks = old.fundClicks + 1;
-      if (fundClicks > 0 && fundClicks % 10 === 0) {
-        playSoundFile(soundFiles.aLotOfSpud, 0.96);
-        enqueueFx({
-          type: "spud",
-          title: "A LOT OF SPUD",
-          subtitle: "That Spud Pile is getting serious.",
-          duration: 2400
-        });
-      }
       return addLog({
         ...markGuidesSeen(old, "fundRisk"),
         fundClicks,
+        sacToPileClicks: 0,
         tots: Number((old.tots - SPUD.riskFundTots).toFixed(1)),
         risk: old.risk + SPUD.riskFundSpud,
         spudCreated: old.spudCreated + SPUD.riskFundSpud,
@@ -1919,13 +1912,28 @@ export default function App() {
 
   function fundRiskFromSac() {
     clearFx();
-    playSfx("fund");
-    if (game.sac > 0 && !game.potato && game.risk <= 0) animateSpudToPile("spudSac");
+    if (game.sac > 0 && !game.potato) animateSpudToPile("spudSac");
     setGame((old) => {
-      if (old.potato || old.risk > 0 || old.sac <= 0) return old;
+      if (old.potato || old.sac <= 0) {
+        playSfx("error");
+        showToast(old.potato ? "Wait until your hands are empty." : "No SPUD in the Spud Sac.");
+        return old;
+      }
+      playSfx("fund");
       const moved = Math.min(SPUD.riskFundSpud, old.sac);
+      const sacToPileClicks = (old.sacToPileClicks || 0) + 1;
+      if (sacToPileClicks > 0 && sacToPileClicks % 10 === 0) {
+        playSoundFile(soundFiles.aLotOfSpud, 0.96);
+        enqueueFx({
+          type: "spud",
+          title: "A LOT OF SPUD",
+          subtitle: "That Spud Pile is getting serious.",
+          duration: 2400
+        });
+      }
       return addLog({
         ...markGuidesSeen(old, "fundFromSac"),
+        sacToPileClicks,
         sac: old.sac - moved,
         risk: old.risk + moved,
         nextAt: old.nextAt || Date.now() + READY_DELIVERY_MIN_MS + Math.random() * READY_DELIVERY_RANGE_MS,
@@ -1977,6 +1985,7 @@ export default function App() {
       pendingSocialPotato: null,
       pendingPower: social ? old.pendingPower : "",
       pendingPowerStreak: social ? old.pendingPowerStreak : 0,
+      sacToPileClicks: 0,
       overdriveActive: false,
       overdriveTaps: []
     }, socialCopy || (power ? "A powered Hot Potato landed." : "A Hot Potato landed."), social?.kind === "golden" ? "good" : "info");
@@ -2176,15 +2185,20 @@ export default function App() {
 
   function moveToSac() {
     clearFx();
-    playSfx("chest");
     stopHoldDrone();
     setGame((old) => {
-      if (old.potato || old.risk <= 0) return old;
+      if (old.potato || old.risk <= 0) {
+        playSfx("error");
+        showToast(old.potato ? "Wait until your hands are empty." : "No SPUD in the Spud Pile.");
+        return old;
+      }
+      playSfx("chest");
       return addLog({
         ...markGuidesSeen(old, "moveSac"),
         sac: old.sac + old.risk,
         risk: 0,
         streak: 0,
+        sacToPileClicks: 0,
         overdriveActive: false,
         overdriveTaps: [],
         pendingPower: "",
@@ -2710,6 +2724,10 @@ function WalletPanel({
   clearSnooze
 }) {
   const payout = rewardedAdPayout(game.ads);
+  const handsEmpty = !game.potato;
+  const canFundRisk = handsEmpty && game.tots >= SPUD.riskFundTots;
+  const canFundFromSac = handsEmpty && game.sac > 0;
+  const canMoveToSac = handsEmpty && game.risk > 0;
   return (
     <aside className="panel wallet-panel">
       <h2>Wallet</h2>
@@ -2758,18 +2776,18 @@ function WalletPanel({
           <button className="ghost debug-ad-override" onClick={() => grantAdReward("Demo ad override")}>
             Test +{payout.tots} Tots
           </button>
-          {!game.potato && game.risk <= 0 && game.tots >= SPUD.riskFundTots && (
-            <button ref={register("fundRisk")} className="danger" onClick={fundRisk}>
+          {handsEmpty && (
+            <button ref={register("fundRisk")} className={`danger ${canFundRisk ? "" : "visually-disabled"}`} onClick={fundRisk} aria-disabled={!canFundRisk}>
               Add to Spud Pile - {SPUD.riskFundTots} Tots
             </button>
           )}
-          {!game.potato && game.risk <= 0 && game.sac > 0 && (
-            <button ref={register("fundFromSac")} className="green" onClick={fundRiskFromSac}>
+          {handsEmpty && (
+            <button ref={register("fundFromSac")} className={`green ${canFundFromSac ? "" : "visually-disabled"}`} onClick={fundRiskFromSac} aria-disabled={!canFundFromSac}>
               Move SPUD to Spud Pile
             </button>
           )}
-          {game.unlocked.sac && !game.potato && game.risk > 0 && (
-            <button ref={register("moveSac")} className="green" onClick={moveToSac}>
+          {handsEmpty && (
+            <button ref={register("moveSac")} className={`green ${canMoveToSac ? "" : "visually-disabled"}`} onClick={moveToSac} aria-disabled={!canMoveToSac}>
               Move to Spud Sac
             </button>
           )}
