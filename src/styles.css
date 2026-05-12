@@ -1516,6 +1516,35 @@ small {
   background: linear-gradient(135deg, #fff2bf, #d6fbff);
 }
 
+.onboarding-rules {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.55rem;
+}
+
+.onboarding-rules span {
+  min-height: 70px;
+  padding: 0.64rem;
+  border: 2px solid rgba(94, 216, 230, 0.34);
+  border-radius: 16px;
+  background: linear-gradient(180deg, #eaffff, #fff8dc);
+  color: #39214f;
+  font-size: 0.78rem;
+  font-weight: 950;
+}
+
+.onboarding-rules strong {
+  display: inline-grid;
+  place-items: center;
+  width: 22px;
+  height: 22px;
+  margin-right: 0.25rem;
+  border-radius: 999px;
+  color: #fff;
+  background: #138bb5;
+  font-size: 0.72rem;
+}
+
 .onboarding-preview strong {
   display: block;
   font-size: 1.8rem;
@@ -4902,6 +4931,16 @@ small {
     border-radius: 20px;
   }
 
+  .onboarding-rules {
+    grid-template-columns: 1fr;
+    gap: 0.42rem;
+  }
+
+  .onboarding-rules span {
+    min-height: 0;
+    padding: 0.52rem;
+  }
+
   .avatar-picker {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
@@ -5666,19 +5705,20 @@ small {
 
   .coach-card.floating {
     z-index: 110;
-    left: 10px !important;
-    right: 10px;
-    top: calc(62px + env(safe-area-inset-top)) !important;
+    left: var(--coach-left, 10px) !important;
+    right: auto;
+    top: var(--coach-top, calc(62px + env(safe-area-inset-top))) !important;
     bottom: auto;
-    width: auto;
-    max-width: none;
+    width: min(300px, calc(100vw - 20px));
+    max-width: calc(100vw - 20px);
     padding: 0.62rem 0.72rem;
     border-radius: 15px;
+    pointer-events: none;
     box-shadow: 0 12px 28px rgba(4, 11, 28, 0.28), 0 0 0 4px rgba(24, 222, 255, 0.16);
   }
 
   .coach-card.floating::after {
-    display: none;
+    display: block;
   }
 
   .coach-card small {

@@ -2,7 +2,7 @@ create extension if not exists pgcrypto;
 
 create table if not exists public.social_potatoes (
   id uuid primary key default gen_random_uuid(),
-  kind text not null check (kind in ('tainted', 'golden')),
+  kind text not null check (kind in ('normal', 'tainted', 'golden')),
   from_name text not null default 'A friend',
   target_handle text,
   target_name text,
@@ -10,6 +10,13 @@ create table if not exists public.social_potatoes (
   claimed_by_name text,
   created_at timestamptz not null default now()
 );
+
+alter table public.social_potatoes
+  drop constraint if exists social_potatoes_kind_check;
+
+alter table public.social_potatoes
+  add constraint social_potatoes_kind_check
+  check (kind in ('normal', 'tainted', 'golden'));
 
 create index if not exists social_potatoes_created_at_idx
   on public.social_potatoes (created_at desc);

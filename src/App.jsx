@@ -27,6 +27,7 @@ const initialGame = {
   onboarded: false,
   connected: false,
   playerId: "",
+  playerHandle: "",
   soundOn: true,
   playerName: "SpudRunner",
   avatar: 0,
@@ -87,13 +88,13 @@ const initialGame = {
   log: []
 };
 
-const ACTIVE_DELIVERY_MIN_MS = 7000;
-const ACTIVE_DELIVERY_RANGE_MS = 7000;
-const POST_PASS_DELIVERY_MIN_MS = 6500;
-const POST_PASS_DELIVERY_RANGE_MS = 7500;
-const READY_DELIVERY_MIN_MS = 3000;
-const READY_DELIVERY_RANGE_MS = 3500;
-const DELIVERY_BACKSTOP_MS = 12000;
+const ACTIVE_DELIVERY_MIN_MS = 4500;
+const ACTIVE_DELIVERY_RANGE_MS = 4500;
+const POST_PASS_DELIVERY_MIN_MS = 3600;
+const POST_PASS_DELIVERY_RANGE_MS = 4200;
+const READY_DELIVERY_MIN_MS = 1200;
+const READY_DELIVERY_RANGE_MS = 1800;
+const DELIVERY_BACKSTOP_MS = 8500;
 const PLAYER_PROFILE_KEY = `${SAVE_KEY}-player-id`;
 
 function makeLocalId() {
@@ -253,6 +254,13 @@ function riskPosture(game, heatScore = 0) {
 }
 
 const socialPotatoes = {
+  normal: {
+    name: "Friend Toss",
+    cost: 0,
+    title: "FRIEND TOSS",
+    description: "A regular Hot Potato passed by another player.",
+    logType: "info"
+  },
   tainted: {
     name: "Tainted Tater",
     cost: 3,
@@ -345,6 +353,12 @@ async function listBackendPlayers(currentPlayerId) {
   return parseBackendResponse(response, "Player list is not available.");
 }
 
+async function listBackendSocialInbox(playerHandle) {
+  const params = new URLSearchParams({ handle: playerHandle || "" });
+  const response = await fetch(`/.netlify/functions/social-potatoes-inbox?${params}`);
+  return parseBackendResponse(response, "Friend potato inbox is not available.");
+}
+
 function readSocialInvite() {
   if (typeof window === "undefined") return null;
   const params = new URLSearchParams(window.location.search);
@@ -393,19 +407,34 @@ function makeSocialPotato(base, invite) {
       socialKind: "golden"
     };
   }
+  if (invite.kind === "tainted") {
+    return {
+      ...base,
+      name: "Tainted Tater",
+      rarity: "Prank",
+      sender: invite.from || "A friend",
+      pool: Math.max(base.pool, 8),
+      heat: base.heat + 18,
+      fuse: Math.min(base.fuse, 42),
+      safeUntil: Math.min(base.safeUntil, 3.2),
+      volatility: Math.max(base.volatility, 1.28),
+      growth: Math.max(base.growth, 1.95),
+      danger: Math.max(base.danger, 0.035),
+      socialKind: "tainted"
+    };
+  }
   return {
     ...base,
-    name: "Tainted Tater",
-    rarity: "Prank",
+    name: "Friend Toss Potato",
+    rarity: "Passed",
     sender: invite.from || "A friend",
-    pool: Math.max(base.pool, 8),
-    heat: base.heat + 18,
-    fuse: Math.min(base.fuse, 42),
-    safeUntil: Math.min(base.safeUntil, 3.2),
-    volatility: Math.max(base.volatility, 1.28),
-    growth: Math.max(base.growth, 1.95),
-    danger: Math.max(base.danger, 0.035),
-    socialKind: "tainted"
+    pool: Math.max(base.pool, 6),
+    heat: base.heat + 4,
+    fuse: Math.max(base.fuse, 64),
+    safeUntil: Math.max(base.safeUntil, 4),
+    volatility: Math.max(base.volatility, 1.02),
+    growth: Math.max(base.growth, 1.12),
+    socialKind: "normal"
   };
 }
 
@@ -624,7 +653,11 @@ export default function App() {
     let cancelled = false;
     (async () => {
       try {
-        await upsertBackendPlayer(game);
+        const result = await upsertBackendPlayer(game);
+        const handle = result?.player?.handle || "";
+        if (!cancelled && handle) {
+          setGame((old) => (old.playerHandle === handle ? old : { ...old, playerHandle: handle }));
+        }
         if (!cancelled) refreshPlayerDirectory(false);
       } catch {
         if (!cancelled) setPlayersStatus("offline");
@@ -645,6 +678,13 @@ export default function App() {
     const timer = setInterval(() => refreshPlayerDirectory(false), 30000);
     return () => clearInterval(timer);
   }, [game.connected, game.playerId]);
+
+  useEffect(() => {
+    if (!game.connected || !game.playerHandle) return undefined;
+    refreshIncomingPotatoes(false);
+    const timer = setInterval(() => refreshIncomingPotatoes(false), 5000);
+    return () => clearInterval(timer);
+  }, [game.connected, game.playerHandle, game.playerName, game.potato?.id, game.pendingSocialPotato?.id]);
 
   useEffect(() => {
     if (game.target > 0 && game.target >= realPlayers.length) {
@@ -723,7 +763,7 @@ export default function App() {
     if (!game.unlocked.equipment && gearOpen) setGearOpen(false);
   }, [game.unlocked.equipment, gearOpen]);
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     if (!guide) return;
     const mobile = window.matchMedia?.("(max-width: 900px)").matches;
     if (!mobile) return;
@@ -907,7 +947,7 @@ export default function App() {
       window.removeEventListener("scroll", refresh);
       window.removeEventListener("resize", refresh);
     };
-  }, [guide?.[0], guide?.[2], game.onboarded, game.connected, game.tots, game.risk, game.sac, game.potato?.id, game.passes]);
+  }, [guide?.[0], guide?.[2], mobileSheet, game.onboarded, game.connected, game.tots, game.risk, game.sac, game.potato?.id, game.passes]);
 
   function showToast(text) {
     setToast(text);
@@ -942,6 +982,37 @@ export default function App() {
     } catch {
       setRealPlayers([]);
       setPlayersStatus("offline");
+    }
+  }
+
+  async function refreshIncomingPotatoes() {
+    if (!game.connected || !game.playerHandle || game.potato || game.pendingSocialPotato) return;
+    try {
+      const result = await listBackendSocialInbox(game.playerHandle);
+      const incoming = (result.potatoes || []).find((item) => item.id && socialPotatoes[item.kind]);
+      if (!incoming) return;
+      const claimed = await claimBackendSocialPotato(incoming.id, game.playerName);
+      if (!claimed?.kind || !socialPotatoes[claimed.kind]) return;
+      const invite = {
+        kind: claimed.kind,
+        from: (claimed.from || incoming.from || "A friend").slice(0, 24),
+        to: (claimed.to || incoming.to || game.playerHandle || "").slice(0, 32),
+        id: (claimed.id || incoming.id).slice(0, 64)
+      };
+      const potato = socialPotatoes[invite.kind];
+      setGame((old) => {
+        if (old.potato || old.pendingSocialPotato || old.log.some((entry) => entry.socialInviteId === invite.id)) return old;
+        return addLog({
+          ...old,
+          pendingSocialPotato: invite,
+          unlocked: { ...old.unlocked, activity: true, target: true }
+        }, invite.kind === "normal"
+          ? `${invite.from} passed you a Hot Potato.`
+          : `${invite.from} sent you a ${potato.name}.`, potato.logType);
+      });
+      showToast(invite.kind === "normal" ? `${invite.from} passed you a Hot Potato.` : `${potato.name} incoming from ${invite.from}.`);
+    } catch {
+      // Keep social play non-blocking if the backend is temporarily unavailable.
     }
   }
 
@@ -1410,7 +1481,9 @@ export default function App() {
     const socialCopy = social
       ? social.kind === "golden"
         ? `A Golden Potato from ${social.from} landed.`
-        : `A Tainted Tater from ${social.from} landed.`
+        : social.kind === "tainted"
+          ? `A Tainted Tater from ${social.from} landed.`
+          : `${social.from} passed you a Hot Potato.`
       : "";
     return addLog({
       ...markGuidesSeen(old, "waitPotato"),
@@ -1422,7 +1495,7 @@ export default function App() {
       pendingPowerStreak: social ? old.pendingPowerStreak : 0,
       overdriveActive: false,
       overdriveTaps: []
-    }, socialCopy || (power ? "A powered Hot Potato landed." : "A Hot Potato landed."), social?.kind === "tainted" ? "bad" : "info");
+    }, socialCopy || (power ? "A powered Hot Potato landed." : "A Hot Potato landed."), social?.kind === "tainted" ? "bad" : social?.kind === "golden" ? "good" : "info");
   }
 
   function sendPotato() {
@@ -1539,6 +1612,11 @@ export default function App() {
         });
       } else {
         setFlightFx({ id: Date.now(), type: "pass", file: old.potato.file });
+      }
+      if (target) {
+        createBackendSocialPotato("normal", old.playerName, target)
+          .then(() => showToast(`Passed to ${targetName}. They will see it when online.`))
+          .catch(() => showToast(`Passed to ${targetName} locally. Friend delivery is offline.`));
       }
       setWalletPulsing(true);
       return addLog({
@@ -1661,7 +1739,7 @@ export default function App() {
     enqueueFx({
       type: kind === "golden" ? "golden-pass" : "baby",
       title: kind === "golden" ? "GOLDEN POTATO SENT" : "TAINTED TATER SENT",
-      subtitle: `${targetName} gets the link.`,
+      subtitle: `${targetName} gets it in their inbox.`,
       note: kind === "golden" ? "Gift energy. Golden Window included." : "Prank energy. Hotter and twitchier.",
       duration: 2600
     });
@@ -1676,15 +1754,16 @@ export default function App() {
         },
         socialXp: (old.socialXp || 0) + (kind === "golden" ? 5 : 4),
         unlocked: { ...old.unlocked, activity: true, target: true }
-      }, `Sent ${targetName} a ${potato.name}. Share link created. -${potato.cost} SPUD, +${kind === "golden" ? 5 : 4} Social XP.`, potato.logType);
+      }, `Sent ${targetName} a ${potato.name}. -${potato.cost} SPUD, +${kind === "golden" ? 5 : 4} Social XP.`, potato.logType);
     });
-    showToast("Creating friend link...");
+    showToast(`Sending ${potato.name} to ${targetName}...`);
     void (async () => {
       let link = fallbackLink;
       try {
         const created = await createBackendSocialPotato(kind, game.playerName, target);
         if (created?.link && !created.fallback) {
-          link = created.link;
+          showToast(`${potato.name} sent to ${targetName}.`);
+          return;
         }
       } catch {
         showToast("Using demo share link.");
@@ -2841,7 +2920,7 @@ function TargetProfile({ game, target, sendFavor, sendSocialPotato }) {
         <small>Real Player</small>
         <strong>{targetName}</strong>
       </div>
-      <p>{targetHandle} can receive friend-sent potatoes from this demo.</p>
+      <p>{targetHandle} can receive passes, favors, and special potatoes from this demo.</p>
       <div className="target-social-row">
         <span>{target.lastSeenAt ? `Last seen ${new Date(target.lastSeenAt).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })}` : "Connected player"}</span>
         <button className={favorSent ? "ghost" : "green"} type="button" onClick={sendFavor} disabled={favorSent}>
@@ -2856,7 +2935,7 @@ function TargetProfile({ game, target, sendFavor, sendSocialPotato }) {
           Golden Potato <small>{socialPotatoes.golden.cost} SPUD</small>
         </button>
       </div>
-      <small className="social-potato-note">Creates a friend link. They open it to receive the potato in their demo.</small>
+      <small className="social-potato-note">Regular passes and special potatoes land in their inbox while they are online.</small>
     </div>
   );
 }
@@ -2882,6 +2961,11 @@ function OnboardingModal({ game, setGame, completeOnboarding }) {
     <div className="modal show">
       <div className="modal-card onboarding-card">
         <h2>Choose Your Player</h2>
+        <div className="onboarding-rules">
+          <span><strong>1</strong> Earn Tots from sponsors.</span>
+          <span><strong>2</strong> Move SPUD into the Spud Pile.</span>
+          <span><strong>3</strong> Pass before it blows.</span>
+        </div>
         <div className="onboarding-preview">
           <div className="avatar large"><img src={assetUrl("Avatars", avatar.file)} alt="" /></div>
           <div><strong>{game.playerName || "SpudRunner"}</strong><span>{avatar.name} style</span></div>
@@ -3116,17 +3200,12 @@ function finishCoachSide(target, targetRect, cardRect) {
 
 function positionCoach(card, target) {
   if (!card || !target) return;
-  if (window.matchMedia?.("(max-width: 900px)").matches) {
-    card.dataset.side = "mobile";
-    card.style.removeProperty("--coach-left");
-    card.style.removeProperty("--coach-top");
-    card.style.removeProperty("--coach-arrow-left");
-    card.style.removeProperty("--coach-arrow-top");
-    return;
-  }
   const targetRect = target.getBoundingClientRect();
   const cardRect = card.getBoundingClientRect();
-  const side = finishCoachSide(target, targetRect, cardRect);
+  const isMobile = window.matchMedia?.("(max-width: 900px)").matches;
+  const side = isMobile
+    ? (targetRect.top > window.innerHeight * 0.48 ? "top" : "bottom")
+    : finishCoachSide(target, targetRect, cardRect);
   const margin = 12;
   const vw = window.innerWidth;
   const vh = window.innerHeight;
@@ -3143,6 +3222,9 @@ function positionCoach(card, target) {
   }
   left = clamp(left, margin, vw - cardRect.width - margin);
   top = clamp(top, margin, vh - cardRect.height - margin);
+  if (isMobile) {
+    top = clamp(top, 70, Math.max(70, vh - cardRect.height - 112));
+  }
 
   card.style.setProperty("--coach-left", `${left}px`);
   card.style.setProperty("--coach-top", `${top}px`);
