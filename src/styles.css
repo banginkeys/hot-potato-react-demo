@@ -2491,6 +2491,68 @@ small {
   color: #9cf4ff;
 }
 
+.fullscreen-fx.gear-unlock .fx-backdrop {
+  background:
+    radial-gradient(circle, rgba(255, 235, 122, 0.48), rgba(41, 18, 90, 0.28) 52%, transparent 74%),
+    conic-gradient(from 0deg, transparent, rgba(255, 206, 62, 0.26), transparent, rgba(124, 245, 255, 0.18), transparent);
+}
+
+.fullscreen-fx.gear-unlock .fx-words strong {
+  color: #ffdf59;
+  font-size: clamp(2.7rem, 10vw, 7rem);
+}
+
+.fullscreen-fx.gear-unlock .fx-words span {
+  background: linear-gradient(180deg, #fff7ba, #ffd14a);
+  color: #3e2600;
+  box-shadow: 0 10px 24px rgba(68, 31, 0, 0.18);
+}
+
+.fx-gear-prize {
+  display: grid;
+  place-items: center;
+  width: 104px;
+  height: 104px;
+  border-radius: 30px;
+  background:
+    radial-gradient(circle at 28% 24%, rgba(255, 255, 255, 0.78), transparent 2.4rem),
+    linear-gradient(145deg, #fff5a8, #ffbd35 58%, #b96d12);
+  box-shadow:
+    0 18px 42px rgba(36, 15, 65, 0.36),
+    inset 0 0 0 4px rgba(255, 255, 255, 0.42);
+  animation: gearPrizePop 900ms cubic-bezier(.16, 1, .3, 1) both, gearPrizeGlow 1.1s ease-in-out 900ms infinite alternate;
+}
+
+.fx-gear-prize .gear-card-icon {
+  width: 58px;
+  height: 58px;
+  border-radius: 16px 16px 20px 20px;
+  transform: scale(1);
+}
+
+.fx-gear-prize .gear-card-icon::before {
+  left: 14px;
+  right: 14px;
+  top: -10px;
+  height: 20px;
+  border-width: 4px;
+}
+
+.fx-gear-prize .gear-card-icon i {
+  transform: translate(-50%, -50%) scale(1.55);
+}
+
+@keyframes gearPrizePop {
+  0% { transform: translateY(18px) scale(0.55) rotate(-10deg); opacity: 0; }
+  52% { transform: translateY(-8px) scale(1.12) rotate(5deg); opacity: 1; }
+  100% { transform: translateY(0) scale(1) rotate(0deg); opacity: 1; }
+}
+
+@keyframes gearPrizeGlow {
+  from { filter: saturate(1) brightness(1); }
+  to { filter: saturate(1.35) brightness(1.1); }
+}
+
 .message-potato-modal {
   z-index: 90;
 }

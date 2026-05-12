@@ -887,10 +887,15 @@ export default function App() {
     unlockedGearRef.current = currentGear;
     if (newlyUnlocked.length) {
       const item = equipment[newlyUnlocked[newlyUnlocked.length - 1]];
-      playSfx("chest");
-      setMobileSheet(null);
-      setGearOpen(true);
-      showToast(`${item.name} unlocked in the Gear Bag.`);
+      enqueueFx({
+        type: "gear-unlock",
+        title: "GEAR UNLOCKED",
+        subtitle: item.name,
+        note: "Available in the Gear Bag.",
+        gearKind: item.icon,
+        duration: 2800,
+        sfx: "chest"
+      });
     }
   }, [game.onboarded, game.connected, game.unlocked.equipment, game.passes, game.explosions, game.won, game.bestWin, game.bestStreak]);
 
@@ -3502,6 +3507,11 @@ function FullscreenFx({ fx }) {
     <div className={`fullscreen-fx ${fx.type}`}>
       <div className="fx-backdrop" />
       <div className="fx-words">
+        {fx.gearKind && (
+          <div className="fx-gear-prize" aria-hidden="true">
+            <div className="gear-card-icon"><GearIcon kind={fx.gearKind} /></div>
+          </div>
+        )}
         <strong>{fx.title}</strong>
         {fx.subtitle && <span>{fx.subtitle}</span>}
         {fx.note && <em>{fx.note}</em>}
