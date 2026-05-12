@@ -29,7 +29,7 @@ const initialGame = {
   playerId: "",
   playerHandle: "",
   soundOn: true,
-  playerName: "SpudRunner",
+  playerName: "",
   avatar: 0,
   wallet: "",
   tots: 0,
@@ -125,6 +125,16 @@ function displayHandle(player) {
 
 function playerDisplayName(player) {
   return player?.name || player?.username || "Player";
+}
+
+function cleanUsername(value) {
+  return String(value || "").replace(/[^\w -]/g, "").slice(0, 16);
+}
+
+function validUsername(value) {
+  const name = cleanUsername(value).trim();
+  const lower = name.toLowerCase();
+  return name.length >= 3 && lower !== "spudrunner" && lower !== "player";
 }
 
 function secretSocialCopy(invite) {
@@ -360,7 +370,7 @@ async function upsertBackendPlayer(game) {
     headers: { "content-type": "application/json" },
     body: JSON.stringify({
       id: playerId,
-      username: game.playerName || "SpudRunner",
+      username: cleanUsername(game.playerName).trim(),
       avatarId: game.avatar || 0,
       wallet: game.wallet || ""
     })
@@ -682,8 +692,11 @@ export default function App() {
           setGame((old) => (old.playerHandle === handle ? old : { ...old, playerHandle: handle }));
         }
         if (!cancelled) refreshPlayerDirectory(false);
-      } catch {
-        if (!cancelled) setPlayersStatus("offline");
+      } catch (error) {
+        if (!cancelled) {
+          setPlayersStatus("offline");
+          showToast(error.message || "Player backend is not available.");
+        }
       }
     })();
     return () => {
@@ -1354,7 +1367,12 @@ export default function App() {
   function completeOnboarding() {
     clearFx();
     playSfx("tap");
-    const playerName = (game.playerName || "").trim() || "SpudRunner";
+    const playerName = cleanUsername(game.playerName).trim();
+    if (!validUsername(playerName)) {
+      playSfx("error");
+      showToast("Pick a unique username first.");
+      return;
+    }
     setGame((old) => ({ ...old, playerName, onboarded: true }));
     showToast(`Welcome, ${playerName}.`);
   }
@@ -1362,11 +1380,17 @@ export default function App() {
   function connect() {
     clearFx();
     playSfx("connect");
+    if (!validUsername(game.playerName)) {
+      playSfx("error");
+      setGame((old) => ({ ...old, onboarded: false }));
+      showToast("Pick a unique username first.");
+      return;
+    }
     setGame((old) => markGuidesSeen({
         ...initialGame,
         onboarded: old.onboarded,
         playerId: coercePlayerId(old.playerId) || getOrCreatePlayerId(),
-        playerName: old.playerName || "SpudRunner",
+        playerName: cleanUsername(old.playerName).trim(),
         avatar: old.avatar,
         seenGuides: { ...(old.seenGuides || {}) },
         pendingSocialPotato: old.pendingSocialPotato || null,
@@ -1403,7 +1427,7 @@ export default function App() {
       ...initialGame,
       onboarded: old.onboarded,
       playerId: coercePlayerId(old.playerId) || getOrCreatePlayerId(),
-      playerName: old.playerName || initialGame.playerName,
+      playerName: cleanUsername(old.playerName).trim(),
       avatar: old.avatar,
       seenGuides: {}
     }));
@@ -3000,15 +3024,15 @@ function OnboardingModal({ game, setGame, completeOnboarding }) {
         </div>
         <div className="onboarding-preview">
           <div className="avatar large"><img src={assetUrl("Avatars", avatar.file)} alt="" /></div>
-          <div><strong>{game.playerName || "SpudRunner"}</strong><span>{avatar.name} style</span></div>
+          <div><strong>{game.playerName || "Your Name"}</strong><span>{avatar.name} style</span></div>
         </div>
         <label>
           Username
           <input
             value={game.playerName}
-            placeholder="SpudRunner"
+            placeholder="Pick a unique name"
             maxLength={16}
-            onChange={(e) => setGame((old) => ({ ...old, playerName: e.target.value.replace(/[^\w -]/g, "").slice(0, 16) }))}
+            onChange={(e) => setGame((old) => ({ ...old, playerName: cleanUsername(e.target.value) }))}
           />
         </label>
         <div className="avatar-picker">
@@ -3019,7 +3043,7 @@ function OnboardingModal({ game, setGame, completeOnboarding }) {
             </button>
           ))}
         </div>
-        <button className="green" onClick={completeOnboarding}>Start Playing</button>
+        <button className="green" onClick={completeOnboarding} disabled={!validUsername(game.playerName)}>Start Playing</button>
       </div>
     </div>
   );

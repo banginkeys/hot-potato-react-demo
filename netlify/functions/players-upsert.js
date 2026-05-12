@@ -1,5 +1,5 @@
 import { json, parseJson, preflight } from "./_lib/http.js";
-import { upsertPlayer } from "./_lib/supabase.js";
+import { findPlayerByUsername, upsertPlayer } from "./_lib/supabase.js";
 import { createHash } from "node:crypto";
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
@@ -37,6 +37,11 @@ function makeHandle(username, id) {
   return `@${slug}-${suffix}`;
 }
 
+function isReservedUsername(username) {
+  const lower = String(username || "").trim().toLowerCase();
+  return lower.length < 3 || lower === "spudrunner" || lower === "player";
+}
+
 export async function handler(event) {
   const options = preflight(event);
   if (options) return options;
@@ -48,6 +53,13 @@ export async function handler(event) {
     if (!id) return json(400, { error: "Missing player id." });
 
     const username = cleanText(body.username, 24) || "SpudRunner";
+    if (isReservedUsername(username)) {
+      return json(400, { error: "Choose a unique username before connecting." });
+    }
+    const existing = await findPlayerByUsername(username);
+    if (existing && existing.id !== id) {
+      return json(409, { error: "That username is already taken." });
+    }
     const record = await upsertPlayer({
       id,
       username,

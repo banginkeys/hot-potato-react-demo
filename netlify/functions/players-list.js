@@ -8,6 +8,8 @@ function cleanId(value) {
 const hiddenTestUsers = new Set([
   "debuguser",
   "legacyuser",
+  "spudrunner",
+  "player",
   "desktopace",
   "mobilemia",
   "desksocial",

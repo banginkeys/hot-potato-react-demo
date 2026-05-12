@@ -152,6 +152,29 @@ export async function upsertPlayer(record) {
   return Array.isArray(body) ? body[0] : body;
 }
 
+export async function findPlayerByUsername(username = "") {
+  const config = envConfig();
+  if (!config.configured) return null;
+  const name = String(username || "").trim();
+  if (!name) return null;
+
+  const params = new URLSearchParams({
+    select: "id,username",
+    username: `ilike.${name}`,
+    limit: "5"
+  });
+  const response = await fetch(`${config.url}/rest/v1/${playersTable}?${params}`, {
+    headers: headers(config.serviceRoleKey)
+  });
+  const body = await response.json().catch(() => null);
+  if (!response.ok) {
+    throw new Error(body?.message || "Could not check username.");
+  }
+  return (Array.isArray(body) ? body : []).find((player) =>
+    String(player.username || "").trim().toLowerCase() === name.toLowerCase()
+  ) || null;
+}
+
 export async function listPlayers(excludeId = "") {
   const config = envConfig();
   if (!config.configured) {
