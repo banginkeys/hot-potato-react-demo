@@ -1240,8 +1240,9 @@ export default function App() {
   function completeOnboarding() {
     clearFx();
     playSfx("tap");
-    setGame((old) => ({ ...old, onboarded: true }));
-    showToast(`Welcome, ${game.playerName || "SpudRunner"}.`);
+    const playerName = (game.playerName || "").trim() || "SpudRunner";
+    setGame((old) => ({ ...old, playerName, onboarded: true }));
+    showToast(`Welcome, ${playerName}.`);
   }
 
   function connect() {
@@ -2883,14 +2884,15 @@ function OnboardingModal({ game, setGame, completeOnboarding }) {
         <h2>Choose Your Player</h2>
         <div className="onboarding-preview">
           <div className="avatar large"><img src={assetUrl("Avatars", avatar.file)} alt="" /></div>
-          <div><strong>{game.playerName}</strong><span>{avatar.name} style</span></div>
+          <div><strong>{game.playerName || "SpudRunner"}</strong><span>{avatar.name} style</span></div>
         </div>
         <label>
           Username
           <input
             value={game.playerName}
+            placeholder="SpudRunner"
             maxLength={16}
-            onChange={(e) => setGame((old) => ({ ...old, playerName: e.target.value.replace(/[^\w -]/g, "").slice(0, 16) || "SpudRunner" }))}
+            onChange={(e) => setGame((old) => ({ ...old, playerName: e.target.value.replace(/[^\w -]/g, "").slice(0, 16) }))}
           />
         </label>
         <div className="avatar-picker">
