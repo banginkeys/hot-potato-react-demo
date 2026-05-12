@@ -95,6 +95,8 @@ const POST_PASS_DELIVERY_RANGE_MS = 4200;
 const READY_DELIVERY_MIN_MS = 1200;
 const READY_DELIVERY_RANGE_MS = 1800;
 const DELIVERY_BACKSTOP_MS = 8500;
+const SOCIAL_DELIVERY_DELAY_MS = 650;
+const SOCIAL_INBOX_POLL_MS = 1500;
 const PLAYER_PROFILE_KEY = `${SAVE_KEY}-player-id`;
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const PIGEON_FLAP_FRAMES = [
@@ -162,6 +164,14 @@ function socialLandingCopy(social) {
   if (social.kind === "golden") return `A Golden Potato from ${from} landed.`;
   if (social.kind === "pigeon") return `A message potato from ${from} fluttered in.`;
   return "A Hot Potato landed. It feels... personal.";
+}
+
+function socialQueueToast(social, game) {
+  if (social?.kind === "normal") return `${social.from || "A friend"} passed you a Hot Potato.`;
+  if (game.risk <= 0) return "Friend potato waiting. Add SPUD to the Spud Pile.";
+  if (game.potato) return "Friend potato queued after this potato.";
+  if (deliveryProtectionActive(game)) return "Friend potato waits until sleep/snooze ends.";
+  return "Friend potato is next.";
 }
 
 function adFileAtIndex(index, excluded = []) {
@@ -611,6 +621,12 @@ function autoDeliveryPaused(game) {
   return !!guide && guide[0] !== "waitPotato";
 }
 
+function socialDeliveryAt(game, now = Date.now()) {
+  if (!game.pendingSocialPotato || !game.connected || game.risk <= 0 || game.potato || deliveryProtectionActive(game)) return game.nextAt || 0;
+  const soon = now + SOCIAL_DELIVERY_DELAY_MS;
+  return game.nextAt ? Math.min(game.nextAt, soon) : soon;
+}
+
 function soundUrl(file) {
   if (/^(?:https?:|data:|blob:|\/)/i.test(String(file || ""))) return file;
   return assetUrl(...String(file || "").split("/").filter(Boolean));
@@ -801,7 +817,7 @@ export default function App() {
   useEffect(() => {
     if (!game.connected || !game.playerHandle) return undefined;
     refreshIncomingPotatoes(false);
-    const timer = setInterval(() => refreshIncomingPotatoes(false), 5000);
+    const timer = setInterval(() => refreshIncomingPotatoes(false), SOCIAL_INBOX_POLL_MS);
     return () => clearInterval(timer);
   }, [game.connected, game.playerHandle, game.playerName, game.potato?.id, game.pendingSocialPotato?.id]);
 
@@ -815,13 +831,17 @@ export default function App() {
     if (!socialInvite) return;
     setGame((old) => {
       if (old.pendingSocialPotato?.id === socialInvite.id || old.log.some((entry) => entry.socialInviteId === socialInvite.id)) return old;
-      return addLog({
+      const queued = {
         ...old,
         pendingSocialPotato: socialInvite,
         unlocked: { ...old.unlocked, activity: true, target: true }
+      };
+      return addLog({
+        ...queued,
+        nextAt: socialDeliveryAt(queued)
       }, secretSocialCopy(socialInvite), "info");
     });
-    showToast(socialInvite.kind === "normal" ? `${socialInvite.from} passed you a Hot Potato.` : "Mystery Hot Potato queued.");
+    showToast(socialQueueToast(socialInvite, game));
     notifyPlayer("Hot Potato incoming", socialInvite.kind === "pigeon" ? `${socialInvite.from} sent a message potato.` : "A social potato is waiting.");
     clearSocialInviteUrl();
     setSocialInvite(null);
@@ -1006,13 +1026,18 @@ export default function App() {
         let next = applyPassiveAdRevenue(old);
         const protectedNow = deliveryProtectionActive(next);
         const tutorialPaused = autoDeliveryPaused(next) && !next.potato;
-        if ((protectedNow || tutorialPaused) && !next.potato && next.nextAt) {
+        const socialPending = !!next.pendingSocialPotato;
+        if ((protectedNow || (tutorialPaused && !socialPending)) && !next.potato && next.nextAt) {
           next = { ...next, nextAt: 0 };
         }
-        if (!protectedNow && !tutorialPaused && next.connected && next.risk > 0 && !next.potato && !next.nextAt) {
+        if (!protectedNow && socialPending && next.connected && next.risk > 0 && !next.potato) {
+          const socialAt = socialDeliveryAt(next);
+          if (socialAt && next.nextAt !== socialAt) next = { ...next, nextAt: socialAt };
+        }
+        if (!protectedNow && !tutorialPaused && !socialPending && next.connected && next.risk > 0 && !next.potato && !next.nextAt) {
           next = { ...next, nextAt: Date.now() + ACTIVE_DELIVERY_MIN_MS + Math.random() * ACTIVE_DELIVERY_RANGE_MS };
         }
-        if (!protectedNow && !tutorialPaused && next.connected && !next.potato && next.nextAt && Date.now() >= next.nextAt) {
+        if (!protectedNow && (socialPending || !tutorialPaused) && next.connected && !next.potato && next.nextAt && Date.now() >= next.nextAt) {
           next = deliverPotato(next);
         }
         if (next.potato) {
@@ -1107,16 +1132,20 @@ export default function App() {
   useEffect(() => {
     if (!game.connected || game.risk <= 0 || game.potato || deliveryProtectionActive(game)) return undefined;
     const now = Date.now();
-    const targetAt = game.nextAt || now + READY_DELIVERY_MIN_MS + Math.random() * READY_DELIVERY_RANGE_MS;
-    const delay = clamp(targetAt - now, 700, DELIVERY_BACKSTOP_MS);
+    const hasSocial = !!game.pendingSocialPotato;
+    const targetAt = hasSocial
+      ? socialDeliveryAt(game, now)
+      : game.nextAt || now + READY_DELIVERY_MIN_MS + Math.random() * READY_DELIVERY_RANGE_MS;
+    const delay = clamp(targetAt - now, hasSocial ? 250 : 700, hasSocial ? 1600 : DELIVERY_BACKSTOP_MS);
     const timer = setTimeout(() => {
       setGame((old) => {
         if (!old.connected || old.risk <= 0 || old.potato || deliveryProtectionActive(old)) return old;
+        if (old.pendingSocialPotato) return deliverPotato({ ...old, nextAt: 0 });
         return deliverPotato({ ...old, nextAt: 0 });
       });
     }, delay);
     return () => clearTimeout(timer);
-  }, [game.connected, game.risk, game.potato?.id, game.nextAt, game.sleepEnabled, game.snoozeUntil, game.unlocked.protection]);
+  }, [game.connected, game.risk, game.potato?.id, game.nextAt, game.pendingSocialPotato?.id, game.sleepEnabled, game.snoozeUntil, game.unlocked.protection]);
 
   useLayoutEffect(() => {
     if (!guide || !coachRef.current) return;
@@ -1268,13 +1297,17 @@ export default function App() {
       };
       setGame((old) => {
         if (old.potato || old.pendingSocialPotato || old.log.some((entry) => entry.socialInviteId === invite.id)) return old;
-        return addLog({
+        const queued = {
           ...old,
           pendingSocialPotato: invite,
           unlocked: { ...old.unlocked, activity: true, target: true }
+        };
+        return addLog({
+          ...queued,
+          nextAt: socialDeliveryAt(queued)
         }, secretSocialCopy(invite), "info");
       });
-      showToast(invite.kind === "normal" ? `${invite.from} passed you a Hot Potato.` : "Mystery Hot Potato queued.");
+      showToast(socialQueueToast(invite, game));
       notifyPlayer("Hot Potato incoming", invite.kind === "pigeon" ? `${invite.from} sent a message potato.` : "A social potato is waiting.");
     } catch {
       // Keep social play non-blocking if the backend is temporarily unavailable.
@@ -2213,7 +2246,7 @@ export default function App() {
     enqueueFx({
       type: kind === "golden" ? "golden-pass" : kind === "pigeon" ? "pigeon" : "baby",
       title: kind === "golden" ? "GOLDEN POTATO SENT" : kind === "pigeon" ? "PIGEON POTATO SENT" : "TAINTED TATER SENT",
-      subtitle: `${targetName} gets it in their inbox.`,
+      subtitle: `${targetName} gets it as their next potato.`,
       note: kind === "golden" ? "Gift energy. Golden Window included." : kind === "pigeon" ? "The message stays hidden until it resolves." : "Prank energy. Hotter and twitchier.",
       duration: 2600
     });
