@@ -1813,7 +1813,11 @@ small {
   width: min(280px, calc(100vw - 2rem));
   border: 3px solid rgba(132, 239, 255, 0.92);
   pointer-events: none;
-  animation: coachPop 220ms ease-out both, coachFocus 900ms ease-in-out infinite alternate;
+  animation:
+    coachPop 220ms ease-out both,
+    coachFocus 900ms ease-in-out infinite alternate,
+    coachBounce 1.65s cubic-bezier(.34, 1.56, .64, 1) infinite;
+  will-change: filter, translate;
 }
 
 .coach-card small {
@@ -1877,6 +1881,14 @@ small {
 @keyframes coachFocus {
   from { filter: saturate(1) brightness(1); }
   to { filter: saturate(1.15) brightness(1.05); }
+}
+
+@keyframes coachBounce {
+  0%, 100% { translate: 0 0; }
+  12% { translate: 0 -7px; }
+  23% { translate: 0 0; }
+  34% { translate: 0 -3px; }
+  44% { translate: 0 0; }
 }
 
 .toast {

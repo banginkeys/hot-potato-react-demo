@@ -1115,10 +1115,6 @@ export default function App() {
     if (!guide || !coachRef.current) return;
     const target = refs.current[guide[0]];
     if (!target) return;
-    const mobile = window.matchMedia?.("(max-width: 900px)").matches;
-    if (!mobile) {
-      target.scrollIntoView({ block: "center", inline: "nearest" });
-    }
     const frame = requestAnimationFrame(() => positionCoach(coachRef.current, target));
     const refresh = () => positionCoach(coachRef.current, target);
     window.addEventListener("scroll", refresh, { passive: true });
