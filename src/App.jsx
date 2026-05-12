@@ -1051,9 +1051,7 @@ export default function App() {
             const burned = socialKind === "pigeon" ? 0 : next.risk;
             stopHoldDrone();
             const boomRect = document.querySelector(".potato-wrap")?.getBoundingClientRect();
-            if (!playRandomSound("potatoExplode", 1)) {
-              playSfx("boom", 1.5);
-            }
+            playExplosionSound();
             setBoom({
               id: Date.now(),
               potatoId: updated.id,
@@ -1553,10 +1551,15 @@ export default function App() {
     return playSoundFile(file, volume);
   }
 
-  function playSoundFile(file, volume = 0.9) {
+  function playSoundFile(file, volume = 0.9, mode = "auto") {
     if (!soundOnRef.current || !file) return null;
     const ctx = ensureAudio();
     const url = soundUrl(file);
+    const cached = audioBuffersRef.current.get(url);
+    if (ctx && (cached?.buffer || (mode === "buffer" && cached?.promise))) {
+      const buffered = playSoundBuffer(url, volume, ctx);
+      if (buffered) return buffered;
+    }
     const audio = getAssetAudio(url);
     audio.volume = clamp(volume, 0, 1);
     audio.muted = false;
@@ -1574,6 +1577,15 @@ export default function App() {
       });
     }
     return audio;
+  }
+
+  function playExplosionSound() {
+    const file = pickSound("potatoExplode");
+    if (!file) {
+      playSfx("boom", 1.5);
+      return null;
+    }
+    return playSoundFile(file, 1, "buffer");
   }
 
   function getAssetAudio(url) {
