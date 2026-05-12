@@ -137,6 +137,11 @@ function validUsername(value) {
   return name.length >= 3 && lower !== "spudrunner" && lower !== "player";
 }
 
+function soundCheckEnabled() {
+  if (typeof window === "undefined") return false;
+  return new URLSearchParams(window.location.search).has("soundCheck");
+}
+
 function secretSocialCopy(invite) {
   if (!invite) return "";
   const from = invite.from || "A friend";
@@ -708,6 +713,7 @@ export default function App() {
   const [friendSearchStatus, setFriendSearchStatus] = useState("idle");
   const [messageDraft, setMessageDraft] = useState("");
   const [messageReveal, setMessageReveal] = useState(null);
+  const [soundCheckOpen, setSoundCheckOpen] = useState(false);
   const refs = useRef({});
   const coachRef = useRef(null);
   const lastSoundRef = useRef({});
@@ -726,11 +732,27 @@ export default function App() {
   const heatScore = game.potato ? clamp(game.potato.age / 92, 0, 1.2) : 0;
   const overdriveBoost = overdriveBoostPercent(game);
   const currentRewardedAdFile = adFileAtIndex(game.nextAdIndex, badAdFiles);
+  const showSoundCheck = soundCheckEnabled();
 
   useEffect(() => {
     localStorage.setItem(SAVE_KEY, JSON.stringify(game));
     soundOnRef.current = game.soundOn;
   }, [game]);
+
+  useEffect(() => {
+    const unlock = () => {
+      if (!soundOnRef.current) return;
+      const ctx = ensureAudio();
+      ctx?.resume?.().catch(() => {});
+      warmCoreSounds();
+    };
+    window.addEventListener("pointerdown", unlock, { capture: true, passive: true });
+    window.addEventListener("keydown", unlock, { capture: true });
+    return () => {
+      window.removeEventListener("pointerdown", unlock, { capture: true });
+      window.removeEventListener("keydown", unlock, { capture: true });
+    };
+  }, []);
 
   useEffect(() => {
     if (!game.connected) return undefined;
@@ -1525,12 +1547,40 @@ export default function App() {
           });
         audioBuffersRef.current.set(url, { promise });
       }
-      audioBuffersRef.current.get(url)?.promise?.then((buffer) => {
-        if (buffer) playBuffer(buffer);
-      });
-      return { pending: true };
+      return fallbackAudio();
     }
     return fallbackAudio();
+  }
+
+  function soundGroupFiles(group) {
+    if (group === "aLotOfSpud") return soundFiles.aLotOfSpud ? [soundFiles.aLotOfSpud] : [];
+    return soundFiles[group] || [];
+  }
+
+  function soundGroupLabel(group) {
+    return {
+      hotStreak: "Hot Streak",
+      potatoExplode: "Potato Explode",
+      babyVoice: "Baby Hands Voice",
+      babyCry: "Baby Hands Cry",
+      scary: "Scary Hold",
+      aLotOfSpud: "A Lot of SPUD"
+    }[group] || group;
+  }
+
+  function playSoundCheckOne(group) {
+    warmCoreSounds();
+    if (group === "aLotOfSpud") return playSoundFile(soundFiles.aLotOfSpud, 0.94);
+    return playRandomSound(group, 0.9);
+  }
+
+  function playSoundCheckGroup(group) {
+    warmCoreSounds();
+    const files = soundGroupFiles(group);
+    files.forEach((file, index) => {
+      window.setTimeout(() => playSoundFile(file, 0.9), index * 1050);
+    });
+    showToast(`Testing ${files.length} ${soundGroupLabel(group)} sound${files.length === 1 ? "" : "s"}.`);
   }
 
   function warmCoreSounds() {
@@ -2361,6 +2411,11 @@ export default function App() {
           <button className="blue sound-toggle" onClick={toggleSound}>
             Sound: {game.soundOn ? "On" : "Off"}
           </button>
+          {showSoundCheck && (
+            <button className="ghost mini-action" onClick={() => setSoundCheckOpen(true)}>
+              Sound Check
+            </button>
+          )}
           <button ref={register("connect")} className="green" onClick={connect} disabled={game.connected}>
             {game.connected ? "Wallet Connected" : "Connect Demo Wallet"}
           </button>
@@ -2520,6 +2575,13 @@ export default function App() {
         />
       )}
       {toast && <div className="toast">{toast}</div>}
+      {showSoundCheck && soundCheckOpen && (
+        <SoundCheckPanel
+          close={() => setSoundCheckOpen(false)}
+          playGroup={playSoundCheckGroup}
+          playOne={playSoundCheckOne}
+        />
+      )}
     </div>
   );
 }
@@ -3496,6 +3558,43 @@ function MessagePotatoModal({ message, close, reply }) {
         <div className="message-actions">
           <button className="blue" type="button" onClick={reply}>Reply</button>
           <button className="ghost" type="button" onClick={close}>Close</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function SoundCheckPanel({ close, playGroup, playOne }) {
+  const groups = [
+    ["hotStreak", "Hot Streak", soundFiles.hotStreak?.length || 0],
+    ["babyVoice", "Baby Hands Voice", soundFiles.babyVoice?.length || 0],
+    ["babyCry", "Baby Hands Cry", soundFiles.babyCry?.length || 0],
+    ["potatoExplode", "Potato Explode", soundFiles.potatoExplode?.length || 0],
+    ["scary", "Scary Hold", soundFiles.scary?.length || 0],
+    ["aLotOfSpud", "A Lot of SPUD", soundFiles.aLotOfSpud ? 1 : 0]
+  ];
+  return (
+    <div className="modal show sound-check-modal">
+      <div className="modal-card sound-check-card">
+        <div className="sound-check-head">
+          <div>
+            <small>Debug</small>
+            <h2>Sound Check</h2>
+          </div>
+          <button className="ghost mini-action" type="button" onClick={close}>Close</button>
+        </div>
+        <p>Use this with <strong>?soundCheck=1</strong> to verify every generated sound group in the React app.</p>
+        <div className="sound-check-list">
+          {groups.map(([key, label, count]) => (
+            <div key={key} className="sound-check-row">
+              <div>
+                <strong>{label}</strong>
+                <span>{count} file{count === 1 ? "" : "s"}</span>
+              </div>
+              <button className="blue mini-action" type="button" onClick={() => playOne(key)} disabled={!count}>Random</button>
+              <button className="ghost mini-action" type="button" onClick={() => playGroup(key)} disabled={!count}>Play All</button>
+            </div>
+          ))}
         </div>
       </div>
     </div>

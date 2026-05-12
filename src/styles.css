@@ -2557,6 +2557,73 @@ small {
   z-index: 90;
 }
 
+.sound-check-modal {
+  z-index: 120;
+}
+
+.sound-check-card {
+  width: min(620px, calc(100vw - 1.4rem));
+  color: #26183e;
+  background:
+    radial-gradient(circle at 85% 8%, rgba(126, 239, 255, 0.46), transparent 4rem),
+    linear-gradient(145deg, #fffdf5, #dff7ff 58%, #fff2c4);
+}
+
+.sound-check-head,
+.sound-check-row {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.sound-check-head {
+  justify-content: space-between;
+  margin-bottom: 0.65rem;
+}
+
+.sound-check-head h2 {
+  margin: 0;
+}
+
+.sound-check-card p {
+  margin: 0 0 0.85rem;
+  color: #574861;
+  font-weight: 850;
+}
+
+.sound-check-card p strong {
+  display: inline;
+}
+
+.sound-check-list {
+  display: grid;
+  gap: 0.55rem;
+}
+
+.sound-check-row {
+  justify-content: space-between;
+  padding: 0.65rem;
+  border: 2px solid rgba(35, 178, 214, 0.18);
+  border-radius: 16px;
+  background: rgba(255, 255, 255, 0.62);
+}
+
+.sound-check-row div {
+  flex: 1;
+  min-width: 0;
+}
+
+.sound-check-row strong,
+.sound-check-row span {
+  display: block;
+}
+
+.sound-check-row span {
+  color: #746282;
+  font-size: 0.82rem;
+  font-weight: 900;
+}
+
 .message-potato-card {
   max-width: min(520px, calc(100vw - 2rem));
   color: #26183e;
