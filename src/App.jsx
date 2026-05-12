@@ -127,6 +127,21 @@ function playerDisplayName(player) {
   return player?.name || player?.username || "Player";
 }
 
+function secretSocialCopy(invite) {
+  if (!invite) return "";
+  const from = invite.from || "A friend";
+  if (invite.kind === "normal") return `${from} tossed you a Hot Potato.`;
+  return "A mystery Hot Potato is headed your way.";
+}
+
+function socialLandingCopy(social) {
+  if (!social) return "";
+  const from = social.from || "A friend";
+  if (social.kind === "normal") return `${from} tossed you a Hot Potato.`;
+  if (social.kind === "golden") return `A Golden Potato from ${from} landed.`;
+  return "A Hot Potato landed. It feels... personal.";
+}
+
 function adFileAtIndex(index, excluded = []) {
   if (!adFiles.length) return "";
   const excludedSet = new Set(excluded);
@@ -417,9 +432,10 @@ function makeSocialPotato(base, invite) {
   if (invite.kind === "tainted") {
     return {
       ...base,
-      name: "Tainted Tater",
-      rarity: "Prank",
-      sender: invite.from || "A friend",
+      name: base.name,
+      rarity: base.rarity,
+      sender: base.sender,
+      prankFrom: invite.from || "A friend",
       pool: Math.max(base.pool, 8),
       heat: base.heat + 18,
       fuse: Math.min(base.fuse, 42),
@@ -701,16 +717,15 @@ export default function App() {
 
   useEffect(() => {
     if (!socialInvite) return;
-    const potato = socialPotatoes[socialInvite.kind];
     setGame((old) => {
       if (old.pendingSocialPotato?.id === socialInvite.id || old.log.some((entry) => entry.socialInviteId === socialInvite.id)) return old;
       return addLog({
         ...old,
         pendingSocialPotato: socialInvite,
         unlocked: { ...old.unlocked, activity: true, target: true }
-      }, `${socialInvite.from} sent you a ${potato.name}. Build your Spud Pile and it can land.`, potato.logType);
+      }, secretSocialCopy(socialInvite), "info");
     });
-    showToast(`${potato.name} received.`);
+    showToast(socialInvite.kind === "normal" ? `${socialInvite.from} passed you a Hot Potato.` : "Mystery Hot Potato queued.");
     clearSocialInviteUrl();
     setSocialInvite(null);
   }, [socialInvite]);
@@ -875,6 +890,8 @@ export default function App() {
           const explode = updated.fuse <= 0 || Math.random() < explosionChance(updated, next.holding);
           if (explode) {
             const burned = next.risk;
+            const socialKind = updated.socialKind || "";
+            const sender = updated.prankFrom || updated.sender || "A friend";
             stopHoldDrone();
             const boomRect = document.querySelector(".potato-wrap")?.getBoundingClientRect();
             if (!playRandomSound("potatoExplode", 1)) {
@@ -889,6 +906,28 @@ export default function App() {
             });
             setWalletBurning(true);
             setFlightFx(null);
+            if (socialKind === "tainted") {
+              enqueueFx({
+                type: "danger",
+                title: `${sender} JUST MASHED YOU!`,
+                subtitle: "That was a Tainted Tater.",
+                note: burned > 0 ? `${fmt(burned)} SPUD got blasted out of the pile.` : "Pure prank energy. No SPUD was exposed.",
+                duration: 3400
+              });
+            } else if (socialKind === "golden") {
+              enqueueFx({
+                type: "golden",
+                title: "GOLDEN GIFT POPPED",
+                subtitle: `${sender}'s Golden Potato went boom before payday.`,
+                note: "The Spud Sac still stayed safe.",
+                duration: 3000
+              });
+            }
+            const explosionCopy = socialKind === "tainted"
+              ? `${sender} mashed you with a Tainted Tater. Explosion burned ${fmt(burned)} SPUD from the Spud Pile.`
+              : socialKind === "golden"
+                ? `${sender}'s Golden Potato exploded. ${fmt(burned)} SPUD burned from the Spud Pile.`
+                : `Explosion burned ${fmt(burned)} SPUD from the Spud Pile. Spud Sac stayed safe.`;
             next = addLog({
               ...markGuidesSeen(next, "pass"),
               potato: null,
@@ -905,7 +944,7 @@ export default function App() {
               pendingPowerStreak: 0,
               walletBurnNonce: next.walletBurnNonce + 1,
               unlocked: { ...next.unlocked, activity: true, sac: true }
-            }, `Explosion burned ${fmt(burned)} SPUD from the Spud Pile. Spud Sac stayed safe.`, "bad");
+            }, explosionCopy, "bad");
           } else {
             next = {
               ...next,
@@ -1006,18 +1045,15 @@ export default function App() {
         to: (claimed.to || incoming.to || game.playerHandle || "").slice(0, 32),
         id: (claimed.id || incoming.id).slice(0, 64)
       };
-      const potato = socialPotatoes[invite.kind];
       setGame((old) => {
         if (old.potato || old.pendingSocialPotato || old.log.some((entry) => entry.socialInviteId === invite.id)) return old;
         return addLog({
           ...old,
           pendingSocialPotato: invite,
           unlocked: { ...old.unlocked, activity: true, target: true }
-        }, invite.kind === "normal"
-          ? `${invite.from} passed you a Hot Potato.`
-          : `${invite.from} sent you a ${potato.name}.`, potato.logType);
+        }, secretSocialCopy(invite), "info");
       });
-      showToast(invite.kind === "normal" ? `${invite.from} passed you a Hot Potato.` : `${potato.name} incoming from ${invite.from}.`);
+      showToast(invite.kind === "normal" ? `${invite.from} passed you a Hot Potato.` : "Mystery Hot Potato queued.");
     } catch {
       // Keep social play non-blocking if the backend is temporarily unavailable.
     }
@@ -1485,13 +1521,16 @@ export default function App() {
     }
     const basePotato = makePotato(old.nextPotatoIndex, power);
     const potato = social ? makeSocialPotato(basePotato, social) : basePotato;
-    const socialCopy = social
-      ? social.kind === "golden"
-        ? `A Golden Potato from ${social.from} landed.`
-        : social.kind === "tainted"
-          ? `A Tainted Tater from ${social.from} landed.`
-          : `${social.from} passed you a Hot Potato.`
-      : "";
+    const socialCopy = socialLandingCopy(social);
+    if (social?.kind === "golden") {
+      setTimeout(() => enqueueFx({
+        type: "golden-pass",
+        title: "GOLDEN GIFT",
+        subtitle: `${social.from || "A friend"} sent you the shiny one.`,
+        note: "Pass during the window for bonus SPUD.",
+        duration: 2600
+      }), 760);
+    }
     return addLog({
       ...markGuidesSeen(old, "waitPotato"),
       potato,
@@ -1502,7 +1541,7 @@ export default function App() {
       pendingPowerStreak: social ? old.pendingPowerStreak : 0,
       overdriveActive: false,
       overdriveTaps: []
-    }, socialCopy || (power ? "A powered Hot Potato landed." : "A Hot Potato landed."), social?.kind === "tainted" ? "bad" : social?.kind === "golden" ? "good" : "info");
+    }, socialCopy || (power ? "A powered Hot Potato landed." : "A Hot Potato landed."), social?.kind === "golden" ? "good" : "info");
   }
 
   function sendPotato() {
@@ -1600,6 +1639,8 @@ export default function App() {
       const overdriveBonus = overdriveBoostPercent(old);
       const target = realPlayers[old.target] || null;
       const targetName = target ? playerDisplayName(target) : "";
+      const receivedKind = old.potato.socialKind || "";
+      const sender = old.potato.prankFrom || old.potato.sender || "A friend";
       const reward = Math.round(old.potato.pool * (golden ? 1.4 : 1));
       const streak = old.streak + 1;
       const pendingPower = nextPowerForStreak(streak) || old.pendingPower;
@@ -1613,12 +1654,29 @@ export default function App() {
         setFlightFx({ id: Date.now(), type: "golden", file: old.potato.file });
         enqueueFx({
           type: "golden-pass",
-          title: "THROUGH THE WINDOW",
-          subtitle: "+40% Golden Window payout landed.",
+          title: receivedKind === "golden" ? "GOLDEN GIFT CASHED" : "THROUGH THE WINDOW",
+          subtitle: receivedKind === "golden" ? `${sender}'s Golden Potato paid out.` : "+40% Golden Window payout landed.",
           duration: 2100
         });
       } else {
         setFlightFx({ id: Date.now(), type: "pass", file: old.potato.file });
+      }
+      if (receivedKind === "tainted") {
+        enqueueFx({
+          type: "danger",
+          title: "PRANK SURVIVED",
+          subtitle: `${sender} tried to mash you. You cashed it instead.`,
+          note: `+${fmt(reward)} SPUD. That's a spicy dodge.`,
+          duration: 2800
+        });
+      } else if (receivedKind === "golden" && !golden) {
+        enqueueFx({
+          type: "golden-pass",
+          title: "GOLDEN GIFT CASHED",
+          subtitle: `${sender}'s Golden Potato landed safely.`,
+          note: `+${fmt(reward)} SPUD.`,
+          duration: 2400
+        });
       }
       if (target) {
         createBackendSocialPotato("normal", old.playerName, target)
@@ -1648,7 +1706,7 @@ export default function App() {
         overdriveTaps: [],
         nextAt: Date.now() + POST_PASS_DELIVERY_MIN_MS + Math.random() * POST_PASS_DELIVERY_RANGE_MS,
         unlocked: { ...old.unlocked, activity: true, sac: true }
-      }, `${targetName ? `Passed to ${targetName}. ` : "Passed the Hot Potato. "}${golden ? "Golden Window +40%. " : ""}${overdriveBonus ? `Overdrive +${Math.round(overdriveBonus)}% fueled the pile. ` : ""}+${fmt(reward)} SPUD landed in the Spud Pile.`, "good");
+      }, `${receivedKind === "tainted" ? `Survived ${sender}'s Tainted Tater. ` : receivedKind === "golden" ? `Cashed ${sender}'s Golden Potato. ` : targetName ? `Passed to ${targetName}. ` : "Passed the Hot Potato. "}${golden ? "Golden Window +40%. " : ""}${overdriveBonus ? `Overdrive +${Math.round(overdriveBonus)}% fueled the pile. ` : ""}+${fmt(reward)} SPUD landed in the Spud Pile.`, "good");
     });
   }
 
@@ -1669,34 +1727,6 @@ export default function App() {
         pendingPowerStreak: 0,
         unlocked: { ...old.unlocked, sac: true, equipment: true }
       }, "Moved the Spud Pile into the Spud Sac. Streak reset.", "info");
-    });
-  }
-
-  function sendFavor() {
-    clearFx();
-    playSfx("chest");
-    setGame((old) => {
-      const target = realPlayers[old.target] || null;
-      if (!target) {
-        playSfx("error");
-        showToast(playersStatus === "offline" ? "Real player list is offline." : "No real player selected.");
-        return old;
-      }
-      const targetName = playerDisplayName(target);
-      const key = target.id || displayHandle(target);
-      const favorsSent = old.favorsSent || [];
-      if (favorsSent.includes(key)) {
-        playSfx("error");
-        showToast(`${targetName} already got a favor.`);
-        return old;
-      }
-      showToast(`Favor sent to ${targetName}.`);
-      return addLog({
-        ...old,
-        favorsSent: [...favorsSent, key],
-        socialXp: old.socialXp + 3,
-        unlocked: { ...old.unlocked, target: true, activity: true }
-      }, `Sent ${targetName} a Tater Favor. +3 Social XP, no SPUD transfer.`, "info");
     });
   }
 
@@ -2068,7 +2098,6 @@ export default function App() {
             realPlayers={realPlayers}
             playersStatus={playersStatus}
             selectedTarget={selectedTarget}
-            sendFavor={sendFavor}
             sendSocialPotato={sendSocialPotato}
             setTarget={(target) => setGame((old) => ({ ...old, target: Number(target) || 0 }))}
             refreshPlayers={() => refreshPlayerDirectory(true)}
@@ -2670,6 +2699,7 @@ function GameControls({ game, passLabel, currentPassCost, overdriveBoost, gearOp
   const canPass = !p || game.tots >= currentPassCost;
   const protectedNow = deliveryProtectionActive(game);
   const golden = goldenWindowActive(p);
+  const potatoOrigin = p ? `${p.rarity} - sent by ${p.sender}` : "Waiting for a valid delivery window.";
   const ownedGear = Object.values(game.equipment || {}).reduce((sum, count) => sum + Math.max(0, Number(count) || 0), 0);
   const activeGear = p ? Object.entries(p.equipment || {}).filter(([key, value]) => key !== "hotSauceSquirts" && value).length : 0;
   return (
@@ -2677,7 +2707,7 @@ function GameControls({ game, passLabel, currentPassCost, overdriveBoost, gearOp
       <div className="between">
         <div>
           <h2>{p ? p.name : "No Hot Potato"}</h2>
-          <div className="tiny">{p ? `${p.rarity} - sent by ${p.sender}` : "Waiting for a valid delivery window."}</div>
+          <div className="tiny">{potatoOrigin}</div>
         </div>
         <span className="chip">{p ? "Active" : "No holder"}</span>
       </div>
@@ -2859,7 +2889,7 @@ function EquipmentDrawer({ game, open, close, buyEquipment, useEquipment }) {
   );
 }
 
-function ActivityPanel({ game, register, realPlayers, playersStatus, selectedTarget, sendFavor, sendSocialPotato, setTarget, refreshPlayers }) {
+function ActivityPanel({ game, register, realPlayers, playersStatus, selectedTarget, sendSocialPotato, setTarget, refreshPlayers }) {
   const spotlight = game.log.find((entry) => entry.type === "good" || entry.type === "bad");
   const playerStatusCopy = playersStatus === "loading"
     ? "Looking..."
@@ -2872,15 +2902,15 @@ function ActivityPanel({ game, register, realPlayers, playersStatus, selectedTar
     <aside className="panel activity-panel" ref={register("activity")}>
       {game.unlocked.target && (
         <details className="target-drawer" defaultOpen>
-          <summary><span>Real Players</span><strong>{selectedTarget ? `${playerDisplayName(selectedTarget)} ${displayHandle(selectedTarget)}` : playerStatusCopy}</strong></summary>
+          <summary><span>Real Players</span><strong>{selectedTarget ? playerDisplayName(selectedTarget) : playerStatusCopy}</strong></summary>
           {realPlayers.length > 0 ? (
             <>
               <select value={Math.min(game.target, realPlayers.length - 1)} onChange={(e) => setTarget(e.target.value)}>
                 {realPlayers.map((target, index) => (
-                  <option key={target.id || target.handle} value={index}>{playerDisplayName(target)} - {displayHandle(target)}</option>
+                  <option key={target.id || target.handle} value={index}>{playerDisplayName(target)}</option>
                 ))}
               </select>
-              <TargetProfile game={game} target={selectedTarget} sendFavor={sendFavor} sendSocialPotato={sendSocialPotato} />
+              <TargetProfile game={game} target={selectedTarget} sendSocialPotato={sendSocialPotato} />
             </>
           ) : (
             <div className="target-empty">
@@ -2904,7 +2934,7 @@ function ActivityPanel({ game, register, realPlayers, playersStatus, selectedTar
         <div className="stat"><small>Best Win</small><strong>{fmt(game.bestWin)}</strong><span>Single pass</span></div>
         <div className="stat bad"><small>Explosions</small><strong>{fmt(game.explosions)}</strong><span>Spud Pile burns</span></div>
         <div className="stat bad"><small>SPUD Burned</small><strong>{fmt(game.burned)}</strong><span>Explosion losses</span></div>
-        <div className="stat good"><small>Social XP</small><strong>{fmt(game.socialXp || 0)}</strong><span>Rivals, favors, passes</span></div>
+        <div className="stat good"><small>Social XP</small><strong>{fmt(game.socialXp || 0)}</strong><span>Rivals and passes</span></div>
       </div>
       <EconomyPulse game={game} />
       <h2>SPUD Activity</h2>
@@ -2915,11 +2945,9 @@ function ActivityPanel({ game, register, realPlayers, playersStatus, selectedTar
   );
 }
 
-function TargetProfile({ game, target, sendFavor, sendSocialPotato }) {
+function TargetProfile({ game, target, sendSocialPotato }) {
   if (!target) return null;
   const targetName = playerDisplayName(target);
-  const targetHandle = displayHandle(target);
-  const favorSent = (game.favorsSent || []).includes(target.id || targetHandle);
   const spendable = socialSpendable(game);
   return (
     <div className="target-profile">
@@ -2927,12 +2955,9 @@ function TargetProfile({ game, target, sendFavor, sendSocialPotato }) {
         <small>Real Player</small>
         <strong>{targetName}</strong>
       </div>
-      <p>{targetHandle} can receive passes, favors, and special potatoes from this demo.</p>
-      <div className="target-social-row">
+      <p>Send regular passes or special potatoes to this player.</p>
+      <div className="target-social-row no-action">
         <span>{target.lastSeenAt ? `Last seen ${new Date(target.lastSeenAt).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })}` : "Connected player"}</span>
-        <button className={favorSent ? "ghost" : "green"} type="button" onClick={sendFavor} disabled={favorSent}>
-          {favorSent ? "Favor Sent" : "Send Favor"}
-        </button>
       </div>
       <div className="social-potato-actions">
         <button className="tainted" type="button" onClick={() => sendSocialPotato("tainted")} disabled={spendable < socialPotatoes.tainted.cost}>
@@ -2942,7 +2967,7 @@ function TargetProfile({ game, target, sendFavor, sendSocialPotato }) {
           Golden Potato <small>{socialPotatoes.golden.cost} SPUD</small>
         </button>
       </div>
-      <small className="social-potato-note">Regular passes and special potatoes land in their inbox while they are online.</small>
+      <small className="social-potato-note">Special potatoes reveal themselves during play.</small>
     </div>
   );
 }
