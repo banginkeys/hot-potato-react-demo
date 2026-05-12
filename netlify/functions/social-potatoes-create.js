@@ -1,10 +1,10 @@
 import { json, parseJson, preflight, publicBaseUrl } from "./_lib/http.js";
 import { createSocialPotato } from "./_lib/supabase.js";
 
-const kinds = new Set(["normal", "tainted", "golden"]);
+const kinds = new Set(["normal", "tainted", "golden", "pigeon"]);
 
 function cleanText(value, max = 40) {
-  return String(value || "").replace(/[^\w .@-]/g, "").trim().slice(0, max);
+  return String(value || "").replace(/[^\w .,@!?'":()-]/g, "").trim().slice(0, max);
 }
 
 export async function handler(event) {
@@ -21,7 +21,8 @@ export async function handler(event) {
       kind,
       from_name: cleanText(body.fromName, 32) || "A friend",
       target_handle: cleanText(body.targetHandle, 24),
-      target_name: cleanText(body.targetName, 32)
+      target_name: cleanText(body.targetName, 32),
+      message: cleanText(body.message, 240)
     });
 
     const link = new URL(publicBaseUrl(event));

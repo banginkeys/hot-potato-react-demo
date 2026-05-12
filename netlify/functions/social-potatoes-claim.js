@@ -2,7 +2,7 @@ import { json, parseJson, preflight } from "./_lib/http.js";
 import { fetchSocialPotato, markSocialPotatoClaimed } from "./_lib/supabase.js";
 
 function cleanText(value, max = 40) {
-  return String(value || "").replace(/[^\w .@-]/g, "").trim().slice(0, max);
+  return String(value || "").replace(/[^\w .,@!?'":()-]/g, "").trim().slice(0, max);
 }
 
 function cleanId(value) {
@@ -38,6 +38,7 @@ export async function handler(event) {
       kind: potato.kind,
       from: potato.from_name || "A friend",
       to: potato.target_handle || potato.target_name || "",
+      message: cleanText(potato.message, 240),
       claimed: true
     });
   } catch (error) {

@@ -1,5 +1,9 @@
 import { json, preflight } from "./_lib/http.js";
-import { listFriends } from "./_lib/supabase.js";
+import { searchPlayersByUsername } from "./_lib/supabase.js";
+
+function cleanText(value, max = 32) {
+  return String(value || "").replace(/[^\w .@-]/g, "").trim().slice(0, max);
+}
 
 function cleanId(value) {
   return String(value || "").replace(/[^\w-]/g, "").trim().slice(0, 64);
@@ -18,19 +22,9 @@ const hiddenTestUsers = new Set([
   "phonet"
 ]);
 
-const hiddenTestWallets = new Set([
-  "0xtest",
-  "0xlegacy",
-  "0xdesktop",
-  "0xmobile",
-  "0xa",
-  "0xb"
-]);
-
 function isHiddenTestPlayer(player) {
   const username = String(player.username || "").trim().toLowerCase();
-  const wallet = String(player.wallet || "").trim().toLowerCase();
-  return hiddenTestUsers.has(username) || hiddenTestWallets.has(wallet);
+  return hiddenTestUsers.has(username);
 }
 
 export async function handler(event) {
@@ -39,8 +33,9 @@ export async function handler(event) {
   if (event.httpMethod !== "GET") return json(405, { error: "Use GET." });
 
   try {
+    const query = cleanText(event.queryStringParameters?.q || event.queryStringParameters?.username, 24);
     const playerId = cleanId(event.queryStringParameters?.playerId);
-    const result = await listFriends(playerId);
+    const result = await searchPlayersByUsername(query, playerId);
     return json(200, {
       configured: result.configured,
       players: (result.players || [])
@@ -55,6 +50,6 @@ export async function handler(event) {
         }))
     });
   } catch (error) {
-    return json(500, { error: error.message || "Could not list players." });
+    return json(500, { error: error.message || "Could not search players." });
   }
 }

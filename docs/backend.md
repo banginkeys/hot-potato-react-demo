@@ -7,7 +7,9 @@ This demo uses Netlify Functions for a small server layer and Supabase/Postgres 
 - Friend-sent social potatoes.
 - Whether a social potato link has already been claimed.
 - Sender name and intended target handle/name.
-- Real player profiles for the friend target list.
+- Real player profiles.
+- Friend links between players.
+- Hidden message text for Pigeon Potatoes.
 
 This is intentionally small. The current player wallet, SPUD pile, gear, and tutorial progress still run locally in the browser demo.
 
@@ -50,9 +52,24 @@ Creates or updates the current demo player's public profile.
 }
 ```
 
-`GET /.netlify/functions/players-list?exclude=<player-id>`
+`GET /.netlify/functions/players-list?playerId=<player-id>`
 
-Returns real connected players for the friend target list. No fake users are returned.
+Returns only the current player's friends. No fake users or global player directory entries are returned.
+
+`GET /.netlify/functions/players-search?q=<username>&playerId=<player-id>`
+
+Searches real usernames so the current player can add a friend.
+
+`POST /.netlify/functions/friends-add`
+
+Adds a mutual friend link.
+
+```json
+{
+  "playerId": "current-player-id",
+  "friendId": "other-player-id"
+}
+```
 
 `POST /.netlify/functions/social-potatoes-create`
 
@@ -60,10 +77,11 @@ Creates a shareable friend potato link.
 
 ```json
 {
-  "kind": "tainted",
+  "kind": "pigeon",
   "fromName": "SpudRunner",
   "targetHandle": "@real-friend-abc12",
-  "targetName": "RealFriend"
+  "targetName": "RealFriend",
+  "message": "This note pops out when the potato resolves."
 }
 ```
 

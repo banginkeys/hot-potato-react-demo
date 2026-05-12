@@ -46,7 +46,7 @@ const initialGame = {
   socialXp: 0,
   claimedGoals: [],
   favorsSent: [],
-  socialSends: { tainted: 0, golden: 0 },
+  socialSends: { tainted: 0, golden: 0, pigeon: 0 },
   pendingSocialPotato: null,
   sleepOpen: false,
   sleepEnabled: false,
@@ -149,6 +149,7 @@ function socialLandingCopy(social) {
   const from = social.from || "A friend";
   if (social.kind === "normal") return `${from} tossed you a Hot Potato.`;
   if (social.kind === "golden") return `A Golden Potato from ${from} landed.`;
+  if (social.kind === "pigeon") return `A message potato from ${from} fluttered in.`;
   return "A Hot Potato landed. It feels... personal.";
 }
 
@@ -305,6 +306,13 @@ const socialPotatoes = {
     title: "GOLDEN POTATO",
     description: "A friendlier gift potato with a Golden Window run.",
     logType: "good"
+  },
+  pigeon: {
+    name: "Pigeon Potato",
+    cost: 1,
+    title: "MESSAGE POTATO",
+    description: "A silly message carrier. The note pops out after the potato resolves.",
+    logType: "info"
   }
 };
 
@@ -323,13 +331,14 @@ function spendSocialCost(game, cost) {
   };
 }
 
-function socialPotatoLink(kind, fromName, target) {
+function socialPotatoLink(kind, fromName, target, message = "") {
   const url = new URL(window.location.href);
   url.search = "";
   url.hash = "";
   url.searchParams.set("socialPotato", kind);
   url.searchParams.set("from", fromName || "A friend");
   url.searchParams.set("to", target?.handle || "");
+  if (message) url.searchParams.set("message", message.slice(0, 220));
   url.searchParams.set("id", `${Date.now().toString(36)}${Math.random().toString(36).slice(2, 7)}`);
   return url.toString();
 }
@@ -342,7 +351,7 @@ async function parseBackendResponse(response, fallbackMessage) {
   return body;
 }
 
-async function createBackendSocialPotato(kind, fromName, target) {
+async function createBackendSocialPotato(kind, fromName, target, message = "") {
   const response = await fetch("/.netlify/functions/social-potatoes-create", {
     method: "POST",
     headers: { "content-type": "application/json" },
@@ -350,7 +359,8 @@ async function createBackendSocialPotato(kind, fromName, target) {
       kind,
       fromName: fromName || "A friend",
       targetHandle: target?.handle || "",
-      targetName: target?.name || ""
+      targetName: target?.name || "",
+      message: message || ""
     })
   });
   return parseBackendResponse(response, "Friend link backend is not available.");
@@ -379,10 +389,26 @@ async function upsertBackendPlayer(game) {
 }
 
 async function listBackendPlayers(currentPlayerId) {
-  const params = currentPlayerId ? new URLSearchParams({ exclude: currentPlayerId }) : new URLSearchParams();
+  const params = currentPlayerId ? new URLSearchParams({ playerId: currentPlayerId }) : new URLSearchParams();
   const query = params.toString();
   const response = await fetch(`/.netlify/functions/players-list${query ? `?${query}` : ""}`);
   return parseBackendResponse(response, "Player list is not available.");
+}
+
+async function searchBackendPlayers(query, currentPlayerId) {
+  const params = new URLSearchParams({ q: query || "" });
+  if (currentPlayerId) params.set("playerId", currentPlayerId);
+  const response = await fetch(`/.netlify/functions/players-search?${params}`);
+  return parseBackendResponse(response, "Player search is not available.");
+}
+
+async function addBackendFriend(playerId, friendId) {
+  const response = await fetch("/.netlify/functions/friends-add", {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ playerId, friendId })
+  });
+  return parseBackendResponse(response, "Friend backend is not available.");
 }
 
 async function listBackendSocialInbox(playerHandle) {
@@ -400,6 +426,7 @@ function readSocialInvite() {
     kind,
     from: (params.get("from") || "A friend").slice(0, 24),
     to: (params.get("to") || "").slice(0, 24),
+    message: (params.get("message") || "").slice(0, 220),
     id: (params.get("id") || `${Date.now()}`).slice(0, 36)
   };
 }
@@ -417,6 +444,7 @@ function clearSocialInviteUrl() {
   url.searchParams.delete("gift");
   url.searchParams.delete("from");
   url.searchParams.delete("to");
+  url.searchParams.delete("message");
   url.searchParams.delete("id");
   window.history.replaceState({}, "", `${url.pathname}${url.search}${url.hash}`);
 }
@@ -442,18 +470,35 @@ function makeSocialPotato(base, invite) {
   if (invite.kind === "tainted") {
     return {
       ...base,
-      name: base.name,
-      rarity: base.rarity,
-      sender: base.sender,
+      name: "Tainted Tater",
+      rarity: "Prank",
+      sender: invite.from || "A friend",
       prankFrom: invite.from || "A friend",
       pool: Math.max(base.pool, 8),
-      heat: base.heat + 18,
-      fuse: Math.min(base.fuse, 42),
-      safeUntil: Math.min(base.safeUntil, 3.2),
-      volatility: Math.max(base.volatility, 1.28),
-      growth: Math.max(base.growth, 1.95),
-      danger: Math.max(base.danger, 0.035),
+      heat: base.heat + 26,
+      fuse: Math.min(base.fuse, 16),
+      safeUntil: Math.min(base.safeUntil, 1.4),
+      volatility: Math.max(base.volatility, 2.15),
+      growth: Math.max(base.growth, 1.65),
+      danger: Math.max(base.danger, 0.075),
       socialKind: "tainted"
+    };
+  }
+  if (invite.kind === "pigeon") {
+    return {
+      ...base,
+      name: "Pigeon Potato",
+      rarity: "Message",
+      sender: invite.from || "A friend",
+      message: invite.message || "",
+      assetPath: "Social Potatoes/pigeon-potato-flap.gif",
+      pool: Math.max(base.pool, 4),
+      heat: Math.max(8, base.heat - 4),
+      fuse: Math.max(base.fuse, 58),
+      safeUntil: Math.max(base.safeUntil, 5),
+      volatility: Math.min(base.volatility, 0.82),
+      growth: Math.max(base.growth, 0.95),
+      socialKind: "pigeon"
     };
   }
   return {
@@ -461,6 +506,7 @@ function makeSocialPotato(base, invite) {
     name: "Friend Toss Potato",
     rarity: "Passed",
     sender: invite.from || "A friend",
+    message: invite.message || "",
     pool: Math.max(base.pool, 6),
     heat: base.heat + 4,
     fuse: Math.max(base.fuse, 64),
@@ -551,7 +597,6 @@ function guideFor(game) {
 
 function autoDeliveryPaused(game) {
   const guide = guideFor(game);
-  if (game.connected && game.risk > 0 && !game.potato) return false;
   return !!guide && guide[0] !== "waitPotato";
 }
 
@@ -658,6 +703,11 @@ export default function App() {
   const [mobileSheet, setMobileSheet] = useState(null);
   const [realPlayers, setRealPlayers] = useState([]);
   const [playersStatus, setPlayersStatus] = useState("idle");
+  const [friendSearch, setFriendSearch] = useState("");
+  const [friendSearchResults, setFriendSearchResults] = useState([]);
+  const [friendSearchStatus, setFriendSearchStatus] = useState("idle");
+  const [messageDraft, setMessageDraft] = useState("");
+  const [messageReveal, setMessageReveal] = useState(null);
   const refs = useRef({});
   const coachRef = useRef(null);
   const lastSoundRef = useRef({});
@@ -708,6 +758,8 @@ export default function App() {
     if (!game.connected) {
       setRealPlayers([]);
       setPlayersStatus("idle");
+      setFriendSearchResults([]);
+      setFriendSearchStatus("idle");
       return undefined;
     }
     refreshPlayerDirectory(true);
@@ -739,6 +791,7 @@ export default function App() {
       }, secretSocialCopy(socialInvite), "info");
     });
     showToast(socialInvite.kind === "normal" ? `${socialInvite.from} passed you a Hot Potato.` : "Mystery Hot Potato queued.");
+    notifyPlayer("Hot Potato incoming", socialInvite.kind === "pigeon" ? `${socialInvite.from} sent a message potato.` : "A social potato is waiting.");
     clearSocialInviteUrl();
     setSocialInvite(null);
   }, [socialInvite]);
@@ -757,6 +810,7 @@ export default function App() {
           kind: claimed.kind,
           from: (claimed.from || "A friend").slice(0, 24),
           to: (claimed.to || "").slice(0, 24),
+          message: (claimed.message || "").slice(0, 220),
           id: (claimed.id || giftLinkId).slice(0, 64)
         });
       } catch (error) {
@@ -810,10 +864,13 @@ export default function App() {
     } else if (target === "activity") {
       setGearOpen(false);
       setMobileSheet("activity");
-    } else if (target !== "equipment") {
+    } else if (target === "equipment") {
+      setMobileSheet(null);
+      setGearOpen(true);
+    } else if (target !== "equipment" && mobileSheet) {
       setMobileSheet(null);
     }
-  }, [guide?.[0]]);
+  }, [guide?.[0], mobileSheet]);
 
   useEffect(() => {
     const currentGear = unlockedEquipmentEntries(game).map(([key]) => key);
@@ -830,6 +887,8 @@ export default function App() {
     if (newlyUnlocked.length) {
       const item = equipment[newlyUnlocked[newlyUnlocked.length - 1]];
       playSfx("chest");
+      setMobileSheet(null);
+      setGearOpen(true);
       showToast(`${item.name} unlocked in the Gear Bag.`);
     }
   }, [game.onboarded, game.connected, game.unlocked.equipment, game.passes, game.explosions, game.won, game.bestWin, game.bestStreak]);
@@ -906,9 +965,9 @@ export default function App() {
           const updated = advancePotato(next.potato, next.holding, powerGrowth);
           const explode = updated.fuse <= 0 || Math.random() < explosionChance(updated, next.holding);
           if (explode) {
-            const burned = next.risk;
             const socialKind = updated.socialKind || "";
             const sender = updated.prankFrom || updated.sender || "A friend";
+            const burned = socialKind === "pigeon" ? 0 : next.risk;
             stopHoldDrone();
             const boomRect = document.querySelector(".potato-wrap")?.getBoundingClientRect();
             if (!playRandomSound("potatoExplode", 1)) {
@@ -931,6 +990,15 @@ export default function App() {
                 note: burned > 0 ? `${fmt(burned)} SPUD got blasted out of the pile.` : "Pure prank energy. No SPUD was exposed.",
                 duration: 3400
               });
+            } else if (socialKind === "pigeon") {
+              revealMessagePotato(updated, "popped");
+              enqueueFx({
+                type: "pigeon",
+                title: "MESSAGE POPPED",
+                subtitle: `${sender} tucked a note inside.`,
+                note: "Read it before you toss a reply.",
+                duration: 2800
+              });
             } else if (socialKind === "golden") {
               enqueueFx({
                 type: "golden",
@@ -942,6 +1010,8 @@ export default function App() {
             }
             const explosionCopy = socialKind === "tainted"
               ? `${sender} mashed you with a Tainted Tater. Explosion burned ${fmt(burned)} SPUD from the Spud Pile.`
+              : socialKind === "pigeon"
+                ? `${sender}'s Pigeon Potato popped open with a message.`
               : socialKind === "golden"
                 ? `${sender}'s Golden Potato exploded. ${fmt(burned)} SPUD burned from the Spud Pile.`
                 : `Explosion burned ${fmt(burned)} SPUD from the Spud Pile. Spud Sac stayed safe.`;
@@ -950,16 +1020,16 @@ export default function App() {
               potato: null,
               holding: false,
               sponsorBreak: null,
-              risk: 0,
+              risk: socialKind === "pigeon" ? next.risk : 0,
               burned: next.burned + burned,
-              explosions: next.explosions + 1,
-              streak: 0,
-              quickPassChain: 0,
+              explosions: socialKind === "pigeon" ? next.explosions : next.explosions + 1,
+              streak: socialKind === "pigeon" ? next.streak : 0,
+              quickPassChain: socialKind === "pigeon" ? next.quickPassChain : 0,
               overdriveActive: false,
               overdriveTaps: [],
-              pendingPower: "",
-              pendingPowerStreak: 0,
-              walletBurnNonce: next.walletBurnNonce + 1,
+              pendingPower: socialKind === "pigeon" ? next.pendingPower : "",
+              pendingPowerStreak: socialKind === "pigeon" ? next.pendingPowerStreak : 0,
+              walletBurnNonce: socialKind === "pigeon" ? next.walletBurnNonce : next.walletBurnNonce + 1,
               unlocked: { ...next.unlocked, activity: true, sac: true }
             }, explosionCopy, "bad");
           } else {
@@ -1016,6 +1086,31 @@ export default function App() {
     setToast(text);
   }
 
+  function requestNotifications() {
+    if (typeof Notification === "undefined" || Notification.permission !== "default") return;
+    Notification.requestPermission().catch(() => {});
+  }
+
+  function notifyPlayer(title, body = "") {
+    if (typeof Notification === "undefined" || Notification.permission !== "granted") return;
+    try {
+      new Notification(title, { body });
+    } catch {
+      // Notifications are a convenience; gameplay should continue without them.
+    }
+  }
+
+  function revealMessagePotato(potato, outcome = "popped") {
+    if (!potato?.message) return;
+    setMessageReveal({
+      id: Date.now(),
+      from: potato.sender || potato.prankFrom || "A friend",
+      message: potato.message,
+      outcome
+    });
+    notifyPlayer("Hot Potato message", `${potato.sender || "A friend"} sent you a message.`);
+  }
+
   async function refreshPlayerDirectory(showLoading = false) {
     if (!game.connected) {
       setRealPlayers([]);
@@ -1048,6 +1143,63 @@ export default function App() {
     }
   }
 
+  async function searchFriends() {
+    const query = cleanUsername(friendSearch).trim();
+    if (query.length < 2) {
+      playSfx("error");
+      showToast("Type at least 2 letters.");
+      return;
+    }
+    setFriendSearchStatus("loading");
+    try {
+      const result = await searchBackendPlayers(query, game.playerId);
+      if (!result.configured) {
+        setFriendSearchResults([]);
+        setFriendSearchStatus("offline");
+        showToast("Friend search needs the backend online.");
+        return;
+      }
+      const existingIds = new Set(realPlayers.map((player) => player.id));
+      const players = (result.players || [])
+        .filter((player) => player.id && player.id !== game.playerId && !existingIds.has(player.id))
+        .map((player) => ({
+          id: player.id,
+          name: player.username || "Player",
+          handle: player.handle || displayHandle(player),
+          avatarId: Number(player.avatarId ?? player.avatar_id ?? 0) || 0,
+          lastSeenAt: player.lastSeenAt || player.last_seen_at || "",
+          wallet: player.wallet || ""
+        }));
+      setFriendSearchResults(players);
+      setFriendSearchStatus(players.length ? "ready" : "empty");
+    } catch (error) {
+      setFriendSearchResults([]);
+      setFriendSearchStatus("offline");
+      showToast(error.message || "Friend search is offline.");
+    }
+  }
+
+  async function addFriendFromSearch(friend) {
+    if (!friend?.id) return;
+    playSfx("tap");
+    setFriendSearchStatus("adding");
+    try {
+      const result = await addBackendFriend(game.playerId, friend.id);
+      if (!result.configured) {
+        setFriendSearchStatus("offline");
+        showToast("Friend backend is offline.");
+        return;
+      }
+      await refreshPlayerDirectory(false);
+      setFriendSearchResults((old) => old.filter((player) => player.id !== friend.id));
+      setFriendSearchStatus("ready");
+      showToast(`${playerDisplayName(friend)} added as a friend.`);
+    } catch (error) {
+      setFriendSearchStatus("offline");
+      showToast(error.message || "Could not add friend.");
+    }
+  }
+
   async function refreshIncomingPotatoes() {
     if (!game.connected || !game.playerHandle || game.potato || game.pendingSocialPotato) return;
     try {
@@ -1060,6 +1212,7 @@ export default function App() {
         kind: claimed.kind,
         from: (claimed.from || incoming.from || "A friend").slice(0, 24),
         to: (claimed.to || incoming.to || game.playerHandle || "").slice(0, 32),
+        message: (claimed.message || incoming.message || "").slice(0, 220),
         id: (claimed.id || incoming.id).slice(0, 64)
       };
       setGame((old) => {
@@ -1071,6 +1224,7 @@ export default function App() {
         }, secretSocialCopy(invite), "info");
       });
       showToast(invite.kind === "normal" ? `${invite.from} passed you a Hot Potato.` : "Mystery Hot Potato queued.");
+      notifyPlayer("Hot Potato incoming", invite.kind === "pigeon" ? `${invite.from} sent a message potato.` : "A social potato is waiting.");
     } catch {
       // Keep social play non-blocking if the backend is temporarily unavailable.
     }
@@ -1378,6 +1532,7 @@ export default function App() {
       return;
     }
     setGame((old) => ({ ...old, playerName, onboarded: true }));
+    requestNotifications();
     showToast(`Welcome, ${playerName}.`);
   }
 
@@ -1401,12 +1556,14 @@ export default function App() {
         log: old.log || [],
         socialSends: old.socialSends || initialGame.socialSends,
         socialXp: old.socialXp || 0,
+        unlocked: { ...initialGame.unlocked, activity: true, target: true },
         connected: true,
         wallet: "0xSPUD...DEMO"
       },
       "connect"
     ));
     showToast("Demo wallet connected.");
+    requestNotifications();
   }
 
   function reset() {
@@ -1558,6 +1715,22 @@ export default function App() {
         note: "Pass during the window for bonus SPUD.",
         duration: 2600
       }), 760);
+    } else if (social?.kind === "tainted") {
+      setTimeout(() => enqueueFx({
+        type: "danger",
+        title: "TAINTED TATER",
+        subtitle: `${social.from || "A friend"} sent you a mean one.`,
+        note: "It has to cool for a few seconds before you can pass it.",
+        duration: 3200
+      }), 760);
+    } else if (social?.kind === "pigeon") {
+      setTimeout(() => enqueueFx({
+        type: "pigeon",
+        title: "MESSAGE POTATO",
+        subtitle: `${social.from || "A friend"} tucked a note inside.`,
+        note: "The message reveals when this potato resolves.",
+        duration: 3000
+      }), 760);
     }
     return addLog({
       ...markGuidesSeen(old, "waitPotato"),
@@ -1642,6 +1815,18 @@ export default function App() {
     setGame((old) => {
       if (!old.potato) return old;
       const cost = passCost(old.potato, old.babyHandsRounds);
+      if (old.potato.socialKind === "tainted" && old.potato.age < 6) {
+        playSfx("error");
+        enqueueFx({
+          type: "danger",
+          title: "TOO HOT",
+          subtitle: "Tainted Taters cannot be passed immediately.",
+          note: `${Math.ceil(6 - old.potato.age)}s until you can try.`,
+          duration: 1400
+        });
+        showToast("Tainted Tater is too unstable to pass yet.");
+        return addLog(old, "Tainted Tater fought the pass. Survive a few seconds first.", "bad");
+      }
       const babyTax = old.babyHandsRounds > 0 && old.potato.age <= 5;
       if (old.tots < cost) {
         playSfx("error");
@@ -1679,7 +1864,7 @@ export default function App() {
       if (triggeredBabyHands) announceBabyHands();
       if (pendingPower && streak % 5 === 0) announceHotStreak(streak, pendingPower);
       if (golden) {
-        setFlightFx({ id: Date.now(), type: "golden", file: old.potato.file });
+        setFlightFx({ id: Date.now(), type: "golden", file: old.potato.file, assetPath: old.potato.assetPath || "" });
         enqueueFx({
           type: "golden-pass",
           title: receivedKind === "golden" ? "GOLDEN GIFT CASHED" : "THROUGH THE WINDOW",
@@ -1687,7 +1872,7 @@ export default function App() {
           duration: 2100
         });
       } else {
-        setFlightFx({ id: Date.now(), type: "pass", file: old.potato.file });
+        setFlightFx({ id: Date.now(), type: "pass", file: old.potato.file, assetPath: old.potato.assetPath || "" });
       }
       if (receivedKind === "tainted") {
         enqueueFx({
@@ -1703,6 +1888,15 @@ export default function App() {
           title: "GOLDEN GIFT CASHED",
           subtitle: `${sender}'s Golden Potato landed safely.`,
           note: `+${fmt(reward)} SPUD.`,
+          duration: 2400
+        });
+      } else if (receivedKind === "pigeon") {
+        revealMessagePotato(old.potato, "passed");
+        enqueueFx({
+          type: "pigeon",
+          title: "MESSAGE DELIVERED",
+          subtitle: `${sender}'s note popped out.`,
+          note: `+${fmt(reward)} SPUD for handling it.`,
           duration: 2400
         });
       }
@@ -1734,7 +1928,7 @@ export default function App() {
         overdriveTaps: [],
         nextAt: Date.now() + POST_PASS_DELIVERY_MIN_MS + Math.random() * POST_PASS_DELIVERY_RANGE_MS,
         unlocked: { ...old.unlocked, activity: true, sac: true }
-      }, `${receivedKind === "tainted" ? `Survived ${sender}'s Tainted Tater. ` : receivedKind === "golden" ? `Cashed ${sender}'s Golden Potato. ` : targetName ? `Passed to ${targetName}. ` : "Passed the Hot Potato. "}${golden ? "Golden Window +40%. " : ""}${overdriveBonus ? `Overdrive +${Math.round(overdriveBonus)}% fueled the pile. ` : ""}+${fmt(reward)} SPUD landed in the Spud Pile.`, "good");
+      }, `${receivedKind === "tainted" ? `Survived ${sender}'s Tainted Tater. ` : receivedKind === "golden" ? `Cashed ${sender}'s Golden Potato. ` : receivedKind === "pigeon" ? `Opened ${sender}'s Pigeon Potato. ` : targetName ? `Passed to ${targetName}. ` : "Passed the Hot Potato. "}${golden ? "Golden Window +40%. " : ""}${overdriveBonus ? `Overdrive +${Math.round(overdriveBonus)}% fueled the pile. ` : ""}+${fmt(reward)} SPUD landed in the Spud Pile.`, "good");
     });
   }
 
@@ -1778,7 +1972,7 @@ export default function App() {
     showToast(`${potato.name} link ready.`);
   }
 
-  function sendSocialPotato(kind) {
+  function sendSocialPotato(kind, message = "") {
     clearFx();
     const potato = socialPotatoes[kind];
     if (!potato) return;
@@ -1792,6 +1986,12 @@ export default function App() {
       showToast(`Need ${potato.cost} SPUD to send ${potato.name}.`);
       return;
     }
+    const cleanMessage = String(message || "").trim().slice(0, 220);
+    if (kind === "pigeon" && cleanMessage.length < 1) {
+      playSfx("error");
+      showToast("Write a message first.");
+      return;
+    }
     const target = realPlayers[game.target] || null;
     if (!target) {
       playSfx("error");
@@ -1799,13 +1999,13 @@ export default function App() {
       return;
     }
     const targetName = playerDisplayName(target);
-    const fallbackLink = socialPotatoLink(kind, game.playerName, target);
-    playSfx(kind === "golden" ? "power" : "error");
+    const fallbackLink = socialPotatoLink(kind, game.playerName, target, cleanMessage);
+    playSfx(kind === "golden" || kind === "pigeon" ? "power" : "error");
     enqueueFx({
-      type: kind === "golden" ? "golden-pass" : "baby",
-      title: kind === "golden" ? "GOLDEN POTATO SENT" : "TAINTED TATER SENT",
+      type: kind === "golden" ? "golden-pass" : kind === "pigeon" ? "pigeon" : "baby",
+      title: kind === "golden" ? "GOLDEN POTATO SENT" : kind === "pigeon" ? "PIGEON POTATO SENT" : "TAINTED TATER SENT",
       subtitle: `${targetName} gets it in their inbox.`,
-      note: kind === "golden" ? "Gift energy. Golden Window included." : "Prank energy. Hotter and twitchier.",
+      note: kind === "golden" ? "Gift energy. Golden Window included." : kind === "pigeon" ? "The message stays hidden until it resolves." : "Prank energy. Hotter and twitchier.",
       duration: 2600
     });
     setGame((old) => {
@@ -1817,23 +2017,25 @@ export default function App() {
           ...(old.socialSends || {}),
           [kind]: ((old.socialSends || {})[kind] || 0) + 1
         },
-        socialXp: (old.socialXp || 0) + (kind === "golden" ? 5 : 4),
+        socialXp: (old.socialXp || 0) + (kind === "golden" ? 5 : kind === "pigeon" ? 2 : 4),
         unlocked: { ...old.unlocked, activity: true, target: true }
-      }, `Sent ${targetName} a ${potato.name}. -${potato.cost} SPUD, +${kind === "golden" ? 5 : 4} Social XP.`, potato.logType);
+      }, `Sent ${targetName} a ${potato.name}. -${potato.cost} SPUD, +${kind === "golden" ? 5 : kind === "pigeon" ? 2 : 4} Social XP.`, potato.logType);
     });
     showToast(`Sending ${potato.name} to ${targetName}...`);
     void (async () => {
       let link = fallbackLink;
       try {
-        const created = await createBackendSocialPotato(kind, game.playerName, target);
+        const created = await createBackendSocialPotato(kind, game.playerName, target, cleanMessage);
         if (created?.link && !created.fallback) {
           showToast(`${potato.name} sent to ${targetName}.`);
+          if (kind === "pigeon") setMessageDraft("");
           return;
         }
       } catch {
         showToast("Using demo share link.");
       }
       await shareSocialPotato(link, potato, target);
+      if (kind === "pigeon") setMessageDraft("");
     })();
   }
 
@@ -2005,6 +2207,7 @@ export default function App() {
 
   function passButtonLabel() {
     if (!game.potato) return "Pass";
+    if (game.potato.socialKind === "tainted" && game.potato.age < 6) return `Survive ${Math.ceil(6 - game.potato.age)}s`;
     const baby = game.babyHandsRounds > 0 && game.potato.age <= 5 ? " x2" : "";
     const golden = goldenWindowActive(game.potato) ? " Right Now +40%" : "";
     return `Pass${golden}${baby} - ${fmt(currentPassCost, 1)} Tots`;
@@ -2105,6 +2308,7 @@ export default function App() {
             toggleGear={() => {
               setMobileSheet(null);
               setGearOpen((open) => !open);
+              setGame((old) => markGuidesSeen(old, "equipment"));
             }}
             useEquipment={useEquipment}
           />
@@ -2126,6 +2330,14 @@ export default function App() {
             realPlayers={realPlayers}
             playersStatus={playersStatus}
             selectedTarget={selectedTarget}
+            friendSearch={friendSearch}
+            setFriendSearch={setFriendSearch}
+            friendSearchResults={friendSearchResults}
+            friendSearchStatus={friendSearchStatus}
+            searchFriends={searchFriends}
+            addFriendFromSearch={addFriendFromSearch}
+            messageDraft={messageDraft}
+            setMessageDraft={setMessageDraft}
             sendSocialPotato={sendSocialPotato}
             setTarget={(target) => setGame((old) => ({ ...old, target: Number(target) || 0 }))}
             refreshPlayers={() => refreshPlayerDirectory(true)}
@@ -2186,6 +2398,20 @@ export default function App() {
       {flightFx && <PotatoFlightFx fx={flightFx} />}
       {boom && <BoomOverlay boom={boom} />}
       {spudTransferFx && <SpudTransferFx fx={spudTransferFx} />}
+      {messageReveal && (
+        <MessagePotatoModal
+          message={messageReveal}
+          close={() => setMessageReveal(null)}
+          reply={() => {
+            const friendIndex = realPlayers.findIndex((player) => playerDisplayName(player).toLowerCase() === String(messageReveal.from || "").toLowerCase());
+            if (friendIndex >= 0) setGame((old) => ({ ...old, target: friendIndex, unlocked: { ...old.unlocked, activity: true, target: true } }));
+            setFriendSearch(friendIndex >= 0 ? "" : messageReveal.from || "");
+            setMessageReveal(null);
+            setMobileSheet("activity");
+            setGearOpen(false);
+          }}
+        />
+      )}
       {toast && <div className="toast">{toast}</div>}
     </div>
   );
@@ -2452,6 +2678,7 @@ function PotatoStage({ game, heatScore, coins, babyCry, overdriveBoost, onBadVid
   const overdriveReady = p?.power === "overdrive" && !game.overdriveActive;
   const overdriveActive = p?.power === "overdrive" && game.overdriveActive;
   const gear = p?.equipment || {};
+  const potatoImage = p?.assetPath ? assetUrl(p.assetPath) : p ? assetUrl("Generic Potatoes Transparent", p.file) : "";
 
   useEffect(() => {
     if (!p) {
@@ -2504,7 +2731,7 @@ function PotatoStage({ game, heatScore, coins, babyCry, overdriveBoost, onBadVid
               <HeatWisps />
               <EquipmentFx />
               <div className="potato-sprite">
-                <img src={assetUrl("Generic Potatoes Transparent", p.file)} alt="Hot Potato" />
+                <img src={potatoImage} alt="Hot Potato" />
                 <BurnOverlays heatScore={heatScore} />
               </div>
               {p.equipment.foilWrap && <div className="gear-badge">Foil</div>}
@@ -2917,20 +3144,45 @@ function EquipmentDrawer({ game, open, close, buyEquipment, useEquipment }) {
   );
 }
 
-function ActivityPanel({ game, register, realPlayers, playersStatus, selectedTarget, sendSocialPotato, setTarget, refreshPlayers }) {
+function ActivityPanel({
+  game,
+  register,
+  realPlayers,
+  playersStatus,
+  selectedTarget,
+  friendSearch,
+  setFriendSearch,
+  friendSearchResults,
+  friendSearchStatus,
+  searchFriends,
+  addFriendFromSearch,
+  messageDraft,
+  setMessageDraft,
+  sendSocialPotato,
+  setTarget,
+  refreshPlayers
+}) {
   const spotlight = game.log.find((entry) => entry.type === "good" || entry.type === "bad");
   const playerStatusCopy = playersStatus === "loading"
     ? "Looking..."
     : playersStatus === "offline"
       ? "Offline"
       : realPlayers.length
-        ? `${realPlayers.length} online`
-        : "No players yet";
+        ? `${realPlayers.length} friend${realPlayers.length === 1 ? "" : "s"}`
+        : "No friends yet";
   return (
     <aside className="panel activity-panel" ref={register("activity")}>
       {game.unlocked.target && (
-        <details className="target-drawer" defaultOpen>
-          <summary><span>Real Players</span><strong>{selectedTarget ? playerDisplayName(selectedTarget) : playerStatusCopy}</strong></summary>
+        <details className="target-drawer" open>
+          <summary><span>Friends</span><strong>{selectedTarget ? playerDisplayName(selectedTarget) : playerStatusCopy}</strong></summary>
+          <FriendSearch
+            query={friendSearch}
+            setQuery={setFriendSearch}
+            results={friendSearchResults}
+            status={friendSearchStatus}
+            searchFriends={searchFriends}
+            addFriend={addFriendFromSearch}
+          />
           {realPlayers.length > 0 ? (
             <>
               <select value={Math.min(game.target, realPlayers.length - 1)} onChange={(e) => setTarget(e.target.value)}>
@@ -2938,13 +3190,19 @@ function ActivityPanel({ game, register, realPlayers, playersStatus, selectedTar
                   <option key={target.id || target.handle} value={index}>{playerDisplayName(target)}</option>
                 ))}
               </select>
-              <TargetProfile game={game} target={selectedTarget} sendSocialPotato={sendSocialPotato} />
+              <TargetProfile
+                game={game}
+                target={selectedTarget}
+                messageDraft={messageDraft}
+                setMessageDraft={setMessageDraft}
+                sendSocialPotato={sendSocialPotato}
+              />
             </>
           ) : (
             <div className="target-empty">
-              <strong>{playersStatus === "offline" ? "Player list offline" : playersStatus === "loading" ? "Finding real players..." : "No real players yet"}</strong>
-              <span>{playersStatus === "offline" ? "Connect Supabase env vars on Netlify to show real usernames here." : "Ask a friend to open the demo, pick a username, and connect."}</span>
-              <button className="ghost mini-action" type="button" onClick={refreshPlayers}>Refresh</button>
+              <strong>{playersStatus === "offline" ? "Friends offline" : playersStatus === "loading" ? "Loading friends..." : "No friends yet"}</strong>
+              <span>{playersStatus === "offline" ? "The friend backend is not responding." : "Search a username above, add them, then send potatoes even when they are away."}</span>
+              <button className="ghost mini-action" type="button" onClick={refreshPlayers}>Refresh Friends</button>
             </div>
           )}
         </details>
@@ -2973,19 +3231,64 @@ function ActivityPanel({ game, register, realPlayers, playersStatus, selectedTar
   );
 }
 
-function TargetProfile({ game, target, sendSocialPotato }) {
+function FriendSearch({ query, setQuery, results, status, searchFriends, addFriend }) {
+  const busy = status === "loading" || status === "adding";
+  return (
+    <div className="friend-search">
+      <div className="friend-search-row">
+        <input
+          value={query}
+          placeholder="Search username"
+          maxLength={16}
+          onChange={(event) => setQuery(cleanUsername(event.target.value))}
+          onKeyDown={(event) => {
+            if (event.key === "Enter") searchFriends();
+          }}
+        />
+        <button className="blue mini-action" type="button" onClick={searchFriends} disabled={busy}>
+          {busy ? "..." : "Find"}
+        </button>
+      </div>
+      {status === "empty" && <small>No matching player found.</small>}
+      {status === "offline" && <small>Friend search is offline.</small>}
+      {results.length > 0 && (
+        <div className="friend-results">
+          {results.map((player) => (
+            <button key={player.id} type="button" onClick={() => addFriend(player)} disabled={busy}>
+              <span>{playerDisplayName(player)}</span>
+              <strong>Add</strong>
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function TargetProfile({ game, target, messageDraft, setMessageDraft, sendSocialPotato }) {
   if (!target) return null;
   const targetName = playerDisplayName(target);
   const spendable = socialSpendable(game);
   return (
     <div className="target-profile">
       <div className="target-vibe">
-        <small>Real Player</small>
+        <small>Friend</small>
         <strong>{targetName}</strong>
       </div>
-      <p>Send regular passes or special potatoes to this player.</p>
+      <p>Send special potatoes to friends. Messages stay hidden until the potato resolves.</p>
       <div className="target-social-row no-action">
-        <span>{target.lastSeenAt ? `Last seen ${new Date(target.lastSeenAt).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })}` : "Connected player"}</span>
+        <span>{target.lastSeenAt ? `Last seen ${new Date(target.lastSeenAt).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })}` : "Friend"}</span>
+      </div>
+      <div className="pigeon-message-box">
+        <textarea
+          value={messageDraft}
+          maxLength={180}
+          placeholder={`Write ${targetName} a hidden message`}
+          onChange={(event) => setMessageDraft(event.target.value.slice(0, 180))}
+        />
+        <button className="pigeon" type="button" onClick={() => sendSocialPotato("pigeon", messageDraft)} disabled={spendable < socialPotatoes.pigeon.cost || !messageDraft.trim()}>
+          Pigeon Potato <small>{socialPotatoes.pigeon.cost} SPUD</small>
+        </button>
       </div>
       <div className="social-potato-actions">
         <button className="tainted" type="button" onClick={() => sendSocialPotato("tainted")} disabled={spendable < socialPotatoes.tainted.cost}>
@@ -3071,6 +3374,27 @@ function AdModal({ game, file, adReady, claimAd, close, onBadVideo }) {
   );
 }
 
+function MessagePotatoModal({ message, close, reply }) {
+  return (
+    <div className="modal show message-potato-modal">
+      <div className="modal-card message-potato-card">
+        <div className="message-potato-head">
+          <img src={assetUrl("Social Potatoes", "pigeon-potato-flap.gif")} alt="" />
+          <div>
+            <small>{message.outcome === "popped" ? "Message popped open" : "Message delivered"}</small>
+            <h2>{message.from} sent a potato note</h2>
+          </div>
+        </div>
+        <blockquote>{message.message}</blockquote>
+        <div className="message-actions">
+          <button className="blue" type="button" onClick={reply}>Reply</button>
+          <button className="ghost" type="button" onClick={close}>Close</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function FullscreenFx({ fx }) {
   return (
     <div className={`fullscreen-fx ${fx.type}`}>
@@ -3088,6 +3412,7 @@ function FullscreenFx({ fx }) {
 }
 
 function PotatoFlightFx({ fx }) {
+  const image = fx.assetPath ? assetUrl(fx.assetPath) : assetUrl("Generic Potatoes Transparent", fx.file);
   return (
     <div className={`potato-flight-fx ${fx.type}`}>
       {fx.type === "golden" && (
@@ -3099,7 +3424,7 @@ function PotatoFlightFx({ fx }) {
           </div>
         </div>
       )}
-      <img src={assetUrl("Generic Potatoes Transparent", fx.file)} alt="" />
+      <img src={image} alt="" />
     </div>
   );
 }

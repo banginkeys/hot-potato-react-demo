@@ -20,6 +20,7 @@ export async function handler(event) {
         kind: potato.kind,
         from: potato.from_name || "A friend",
         to: potato.target_handle || potato.target_name || "",
+        message: potato.message || "",
         createdAt: potato.created_at
       }))
     });

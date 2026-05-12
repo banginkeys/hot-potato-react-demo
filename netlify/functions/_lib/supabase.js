@@ -2,6 +2,7 @@ import { randomUUID } from "node:crypto";
 
 const socialTable = "social_potatoes";
 const playersTable = "players";
+const friendsTable = "player_friends";
 
 function cleanEnv(value) {
   return String(value || "").trim().replace(/^['"]+|['"]+$/g, "").trim();
@@ -27,6 +28,10 @@ function envConfig() {
 
 function isLegacyJwtKey(key) {
   return key.split(".").length === 3;
+}
+
+function cleanUuid(value) {
+  return String(value || "").replace(/[^\w-]/g, "").trim().slice(0, 64);
 }
 
 function headers(serviceRoleKey, prefer) {
@@ -97,7 +102,7 @@ export async function fetchSocialPotato(id) {
   }
   const params = new URLSearchParams({
     id: `eq.${id}`,
-    select: "id,kind,from_name,target_handle,target_name,created_at,claimed_at"
+    select: "id,kind,from_name,target_handle,target_name,message,created_at,claimed_at"
   });
   const response = await fetch(`${config.url}/rest/v1/${socialTable}?${params}`, {
     headers: headers(config.serviceRoleKey)
@@ -175,6 +180,103 @@ export async function findPlayerByUsername(username = "") {
   ) || null;
 }
 
+export async function searchPlayersByUsername(query = "", excludeId = "") {
+  const config = envConfig();
+  if (!config.configured) return { configured: false, players: [] };
+  const q = String(query || "").trim().replace(/[%*,]/g, "").slice(0, 24);
+  if (q.length < 2) return { configured: true, players: [] };
+
+  const params = new URLSearchParams({
+    select: "id,username,handle,avatar_id,wallet,last_seen_at",
+    username: `ilike.*${q}*`,
+    order: "username.asc",
+    limit: "8"
+  });
+  const playerId = cleanUuid(excludeId);
+  if (playerId) params.set("id", `neq.${playerId}`);
+
+  const response = await fetch(`${config.url}/rest/v1/${playersTable}?${params}`, {
+    headers: headers(config.serviceRoleKey)
+  });
+  const body = await response.json().catch(() => null);
+  if (!response.ok) {
+    throw new Error(body?.message || "Could not search players.");
+  }
+  return { configured: true, players: Array.isArray(body) ? body : [] };
+}
+
+async function fetchPlayersByIds(config, ids = []) {
+  const cleanIds = [...new Set(ids.map(cleanUuid).filter(Boolean))];
+  if (!cleanIds.length) return [];
+  const params = new URLSearchParams({
+    select: "id,username,handle,avatar_id,wallet,last_seen_at",
+    id: `in.(${cleanIds.join(",")})`
+  });
+  const response = await fetch(`${config.url}/rest/v1/${playersTable}?${params}`, {
+    headers: headers(config.serviceRoleKey)
+  });
+  const body = await response.json().catch(() => null);
+  if (!response.ok) {
+    throw new Error(body?.message || "Could not fetch friend profiles.");
+  }
+  const byId = new Map((Array.isArray(body) ? body : []).map((player) => [player.id, player]));
+  return cleanIds.map((id) => byId.get(id)).filter(Boolean);
+}
+
+export async function listFriends(playerId = "") {
+  const config = envConfig();
+  if (!config.configured) {
+    return { configured: false, players: [] };
+  }
+  const id = cleanUuid(playerId);
+  if (!id) return { configured: true, players: [] };
+
+  const params = new URLSearchParams({
+    player_id: `eq.${id}`,
+    select: "friend_id,created_at",
+    order: "created_at.desc",
+    limit: "50"
+  });
+  const response = await fetch(`${config.url}/rest/v1/${friendsTable}?${params}`, {
+    headers: headers(config.serviceRoleKey)
+  });
+  const body = await response.json().catch(() => null);
+  if (!response.ok) {
+    throw new Error(body?.message || "Could not list friends.");
+  }
+  const friends = Array.isArray(body) ? body : [];
+  const players = await fetchPlayersByIds(config, friends.map((friend) => friend.friend_id));
+  return { configured: true, players };
+}
+
+export async function addFriend(playerId = "", friendId = "") {
+  const config = envConfig();
+  if (!config.configured) {
+    return { configured: false, players: [] };
+  }
+  const id = cleanUuid(playerId);
+  const target = cleanUuid(friendId);
+  if (!id || !target || id === target) {
+    throw new Error("Choose a real player to add.");
+  }
+
+  const records = [
+    { player_id: id, friend_id: target },
+    { player_id: target, friend_id: id }
+  ];
+  const response = await fetch(`${config.url}/rest/v1/${friendsTable}?on_conflict=player_id,friend_id`, {
+    method: "POST",
+    headers: headers(config.serviceRoleKey, "resolution=ignore-duplicates,return=minimal"),
+    body: JSON.stringify(records)
+  });
+  if (!response.ok) {
+    const body = await response.json().catch(() => null);
+    throw new Error(body?.message || "Could not add friend.");
+  }
+  const players = await fetchPlayersByIds(config, [target]);
+  return { configured: true, players };
+}
+
 export async function listPlayers(excludeId = "") {
   const config = envConfig();
   if (!config.configured) {
@@ -209,7 +311,7 @@ export async function listIncomingSocialPotatoes(handle = "") {
   const params = new URLSearchParams({
     target_handle: `eq.${target}`,
     claimed_at: "is.null",
-    select: "id,kind,from_name,target_handle,target_name,created_at",
+    select: "id,kind,from_name,target_handle,target_name,message,created_at",
     order: "created_at.asc",
     limit: "5"
   });
