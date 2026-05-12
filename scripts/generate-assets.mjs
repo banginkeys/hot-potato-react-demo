@@ -10,7 +10,10 @@ const outFile = join(appRoot, "src", "assetManifest.js");
 const publicRoot = join(appRoot, "public");
 
 function filesIn(pathParts, extensions) {
-  const dir = join(assetsRoot, ...pathParts);
+  return filesInDir(join(assetsRoot, ...pathParts), extensions);
+}
+
+function filesInDir(dir, extensions) {
   try {
     return readdirSync(dir)
       .filter((name) => {
@@ -73,8 +76,8 @@ function uniqueSafeFileName(file, used) {
 
 function generatedPublicFiles(pathParts, extensions) {
   const files = filesIn(pathParts, extensions);
-  if (!files.length) return [];
   const outDir = join(publicRoot, ...pathParts);
+  if (!files.length) return filesInDir(outDir, extensions);
   mkdirSync(outDir, { recursive: true });
   return files.map((file) => {
     const source = join(assetsRoot, ...pathParts, file);
@@ -138,12 +141,15 @@ function assetRef(name) {
 
 function generatedSoundFiles(pathParts, outputName) {
   const files = filesIn(pathParts, [".wav", ".mp3", ".ogg"]);
-  if (!files.length) return [];
   const outDir = join(appRoot, "src", "__generated_sounds", outputName);
-  mkdirSync(outDir, { recursive: true });
-  return files.map((file, index) => {
-    const safeName = `${String(index + 1).padStart(2, "0")}-${safeSoundName(file)}`;
-    copyFileSync(join(assetsRoot, ...pathParts, file), join(outDir, safeName));
+  if (files.length) {
+    mkdirSync(outDir, { recursive: true });
+    files.forEach((file, index) => {
+      const safeName = `${String(index + 1).padStart(2, "0")}-${safeSoundName(file)}`;
+      copyFileSync(join(assetsRoot, ...pathParts, file), join(outDir, safeName));
+    });
+  }
+  return filesInDir(outDir, [".wav", ".mp3", ".ogg"]).map((safeName) => {
     const importName = `sound_${soundImports.length}`;
     soundImports.push(`import ${importName} from ${JSON.stringify(`./__generated_sounds/${outputName}/${safeName}?url`)};`);
     return assetRef(importName);
