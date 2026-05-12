@@ -835,13 +835,17 @@ export default function App() {
   }, [game.onboarded, game.connected, game.unlocked.equipment, game.passes, game.explosions, game.won, game.bestWin, game.bestStreak]);
 
   useEffect(() => {
-    if (activeFx || !fxQueue.length) return undefined;
+    if (activeFx || !fxQueue.length) return;
     const [next, ...rest] = fxQueue;
     setFxQueue(rest);
     setActiveFx(next);
-    const timer = setTimeout(() => setActiveFx(null), next.duration || 2400);
-    return () => clearTimeout(timer);
   }, [activeFx, fxQueue]);
+
+  useEffect(() => {
+    if (!activeFx) return undefined;
+    const timer = setTimeout(() => setActiveFx(null), activeFx.duration || 2400);
+    return () => clearTimeout(timer);
+  }, [activeFx?.id]);
 
   useEffect(() => {
     if (!boom) return undefined;
