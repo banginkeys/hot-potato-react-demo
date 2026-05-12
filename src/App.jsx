@@ -709,6 +709,7 @@ export default function App() {
   const [walletPulsing, setWalletPulsing] = useState(false);
   const [flightFx, setFlightFx] = useState(null);
   const [spudTransferFx, setSpudTransferFx] = useState(null);
+  const [spudWinFx, setSpudWinFx] = useState(null);
   const [badAdFiles, setBadAdFiles] = useState([]);
   const [gearOpen, setGearOpen] = useState(false);
   const [mobileSheet, setMobileSheet] = useState(null);
@@ -992,6 +993,12 @@ export default function App() {
     const timer = setTimeout(() => setSpudTransferFx(null), 1100);
     return () => clearTimeout(timer);
   }, [spudTransferFx]);
+
+  useEffect(() => {
+    if (!spudWinFx) return undefined;
+    const timer = setTimeout(() => setSpudWinFx(null), 1900);
+    return () => clearTimeout(timer);
+  }, [spudWinFx]);
 
   useEffect(() => {
     const timer = setInterval(() => {
@@ -2058,6 +2065,11 @@ export default function App() {
       stopHoldDrone();
       playSfx("pass");
       playSfx("win", Math.max(0.5, reward / 24));
+      setSpudWinFx({
+        id: Date.now(),
+        amount: reward,
+        note: golden ? "Golden Window bonus" : overdriveBonus ? "Overdrive boosted the pile" : "landed in the Spud Pile"
+      });
       if (triggeredBabyHands) announceBabyHands();
       if (pendingPower && streak % 5 === 0) announceHotStreak(streak, pendingPower);
       if (golden) {
@@ -2600,6 +2612,7 @@ export default function App() {
       {flightFx && <PotatoFlightFx fx={flightFx} />}
       {boom && <BoomOverlay boom={boom} />}
       {spudTransferFx && <SpudTransferFx fx={spudTransferFx} />}
+      {spudWinFx && <SpudWinPop fx={spudWinFx} />}
       {messageReveal && (
         <MessagePotatoModal
           message={messageReveal}
@@ -3791,6 +3804,36 @@ function SpudTransferFx({ fx }) {
           />
         );
       })}
+    </div>
+  );
+}
+
+function SpudWinPop({ fx }) {
+  return (
+    <div className="spud-win-pop" aria-live="polite" aria-label={`${fmt(fx.amount)} SPUD won`}>
+      <div className="spud-win-card">
+        <small>SPUD WON</small>
+        <strong>+{fmt(fx.amount)}</strong>
+        <span>SPUD</span>
+        <em>{fx.note}</em>
+      </div>
+      <div className="spud-win-burst" aria-hidden="true">
+        {Array.from({ length: 14 }, (_, i) => {
+          const angle = (i / 14) * Math.PI * 2 - Math.PI / 2;
+          const radiusX = 110 + (i % 4) * 20;
+          const radiusY = 72 + (i % 3) * 14;
+          return (
+            <i
+              key={`${fx.id}-${i}`}
+              style={{
+                "--i": i,
+                "--dx": `${Math.cos(angle) * radiusX}px`,
+                "--dy": `${Math.sin(angle) * radiusY}px`
+              }}
+            />
+          );
+        })}
+      </div>
     </div>
   );
 }
