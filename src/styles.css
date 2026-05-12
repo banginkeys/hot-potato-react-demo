@@ -4169,27 +4169,6 @@ small {
   transform: translateX(-50%) rotate(var(--r));
 }
 
-.pile-label {
-  position: absolute;
-  left: 50%;
-  bottom: 4px;
-  z-index: 8;
-  min-width: 170px;
-  transform: translateX(-50%);
-  padding: 0.42rem 0.7rem;
-  border-radius: 999px;
-  color: #fff;
-  text-align: center;
-  background: rgba(61, 36, 88, 0.78);
-  box-shadow: 0 8px 18px rgba(61, 36, 88, 0.18);
-  font-size: 0.86rem;
-  font-weight: 1000;
-}
-
-.spud-pile.fast .pile-label {
-  background: linear-gradient(180deg, rgba(255, 80, 56, 0.96), rgba(151, 26, 17, 0.96));
-}
-
 .details {
   padding: 18px;
   border-top: 2px solid rgba(68, 38, 99, 0.1);
@@ -4936,12 +4915,6 @@ small {
   .spud-pile .pile-coins span {
     width: 25px;
     height: 17px;
-  }
-
-  .pile-label {
-    min-width: 134px;
-    padding: 0.34rem 0.56rem;
-    font-size: 0.72rem;
   }
 
   .power-banner,
@@ -5734,12 +5707,6 @@ small {
   .spud-pile .pile-coins span {
     width: 23px;
     height: 16px;
-  }
-
-  .pile-label {
-    min-width: 124px;
-    padding: 0.3rem 0.5rem;
-    font-size: 0.68rem;
   }
 
   .details {

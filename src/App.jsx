@@ -2975,7 +2975,6 @@ function PotatoStage({ game, heatScore, coins, babyCry, overdriveBoost, onBadVid
                 <span key={i} style={{ "--x": `${coin.x}px`, "--y": `${coin.y}px`, "--r": `${coin.r}deg`, "--z": coin.z }} />
               ))}
             </div>
-            <div className="pile-label">{game.holding || p.power === "overdrive" ? "Prize pile surging" : "Prize pile growing"}</div>
           </div>
           {game.sponsorBreak && (
             <div className="risk-ad">
