@@ -3,11 +3,24 @@ import { randomUUID } from "node:crypto";
 const socialTable = "social_potatoes";
 const playersTable = "players";
 
+function cleanEnv(value) {
+  return String(value || "").trim().replace(/^['"]+|['"]+$/g, "").trim();
+}
+
 function envConfig() {
-  const url = (process.env.SUPABASE_URL || "").trim();
-  const serviceRoleKey = (process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SECRET_KEY || "").trim();
+  const url = cleanEnv(process.env.SUPABASE_URL || process.env.SUPABASE_PROJECT_URL).replace(/\/+$/, "");
+  const serviceRoleKey = cleanEnv(
+    process.env.SUPABASE_SERVICE_ROLE_KEY ||
+      process.env.SUPABASE_SECRET_KEY ||
+      process.env.SUPABASE_ANON_KEY ||
+      process.env.SUPABASE_PUBLISHABLE_KEY
+  ).replace(/\s+/g, "");
+
   if (!url || !serviceRoleKey) {
     return { configured: false, reason: "SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY are required." };
+  }
+  if (/^https?:\/\//i.test(serviceRoleKey)) {
+    return { configured: false, reason: "SUPABASE_SERVICE_ROLE_KEY appears to be a URL, not an API key." };
   }
   return { configured: true, url: url.replace(/\/+$/, ""), serviceRoleKey };
 }
