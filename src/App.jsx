@@ -96,6 +96,7 @@ const READY_DELIVERY_MIN_MS = 1200;
 const READY_DELIVERY_RANGE_MS = 1800;
 const DELIVERY_BACKSTOP_MS = 8500;
 const PLAYER_PROFILE_KEY = `${SAVE_KEY}-player-id`;
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
 function makeLocalId() {
   if (typeof crypto !== "undefined" && crypto.randomUUID) return crypto.randomUUID();
@@ -104,9 +105,14 @@ function makeLocalId() {
   );
 }
 
+function coercePlayerId(value) {
+  const id = String(value || "").trim();
+  return UUID_RE.test(id) ? id.toLowerCase() : "";
+}
+
 function getOrCreatePlayerId() {
   if (typeof localStorage === "undefined") return makeLocalId();
-  const existing = localStorage.getItem(PLAYER_PROFILE_KEY);
+  const existing = coercePlayerId(localStorage.getItem(PLAYER_PROFILE_KEY));
   if (existing) return existing;
   const created = makeLocalId();
   localStorage.setItem(PLAYER_PROFILE_KEY, created);
@@ -333,11 +339,12 @@ async function claimBackendSocialPotato(id, claimedByName) {
 }
 
 async function upsertBackendPlayer(game) {
+  const playerId = coercePlayerId(game.playerId) || getOrCreatePlayerId();
   const response = await fetch("/.netlify/functions/players-upsert", {
     method: "POST",
     headers: { "content-type": "application/json" },
     body: JSON.stringify({
-      id: game.playerId || getOrCreatePlayerId(),
+      id: playerId,
       username: game.playerName || "SpudRunner",
       avatarId: game.avatar || 0,
       wallet: game.wallet || ""
@@ -461,7 +468,7 @@ function loadGame() {
     return {
       ...initialGame,
       ...loaded,
-      playerId: loaded.playerId || getOrCreatePlayerId(),
+      playerId: coercePlayerId(loaded.playerId) || getOrCreatePlayerId(),
       holding: false,
       potato: null,
       sponsorBreak: null,
@@ -1322,7 +1329,7 @@ export default function App() {
     setGame((old) => markGuidesSeen({
         ...initialGame,
         onboarded: old.onboarded,
-        playerId: old.playerId || getOrCreatePlayerId(),
+        playerId: coercePlayerId(old.playerId) || getOrCreatePlayerId(),
         playerName: old.playerName || "SpudRunner",
         avatar: old.avatar,
         seenGuides: { ...(old.seenGuides || {}) },
@@ -1359,7 +1366,7 @@ export default function App() {
     setGame((old) => ({
       ...initialGame,
       onboarded: old.onboarded,
-      playerId: old.playerId || getOrCreatePlayerId(),
+      playerId: coercePlayerId(old.playerId) || getOrCreatePlayerId(),
       playerName: old.playerName || initialGame.playerName,
       avatar: old.avatar,
       seenGuides: {}

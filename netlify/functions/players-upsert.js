@@ -1,5 +1,8 @@
 import { json, parseJson, preflight } from "./_lib/http.js";
 import { upsertPlayer } from "./_lib/supabase.js";
+import { createHash } from "node:crypto";
+
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
 function cleanText(value, max = 40) {
   return String(value || "").replace(/[^\w .@-]/g, "").trim().slice(0, max);
@@ -7,6 +10,21 @@ function cleanText(value, max = 40) {
 
 function cleanId(value) {
   return String(value || "").replace(/[^\w-]/g, "").trim().slice(0, 64);
+}
+
+function asUuid(value) {
+  const raw = cleanId(value);
+  if (!raw) return "";
+  if (UUID_RE.test(raw)) return raw.toLowerCase();
+
+  const hash = createHash("sha1").update(raw).digest("hex");
+  const part1 = hash.slice(0, 8);
+  const part2 = hash.slice(8, 12);
+  const part3 = `5${hash.slice(13, 16)}`;
+  const variantNibble = (8 + (parseInt(hash.slice(16, 17), 16) % 4)).toString(16);
+  const part4 = `${variantNibble}${hash.slice(17, 20)}`;
+  const part5 = hash.slice(20, 32);
+  return `${part1}-${part2}-${part3}-${part4}-${part5}`;
 }
 
 function makeHandle(username, id) {
@@ -26,7 +44,7 @@ export async function handler(event) {
 
   try {
     const body = parseJson(event);
-    const id = cleanId(body.id);
+    const id = asUuid(body.id);
     if (!id) return json(400, { error: "Missing player id." });
 
     const username = cleanText(body.username, 24) || "SpudRunner";
