@@ -97,6 +97,12 @@ const READY_DELIVERY_RANGE_MS = 1800;
 const DELIVERY_BACKSTOP_MS = 8500;
 const PLAYER_PROFILE_KEY = `${SAVE_KEY}-player-id`;
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+const PIGEON_FLAP_FRAMES = [
+  "pigeon-potato-flap-frame-1.png",
+  "pigeon-potato-flap-frame-2.png",
+  "pigeon-potato-flap-frame-3.png",
+  "pigeon-potato-flap-frame-4.png"
+];
 
 function makeLocalId() {
   if (typeof crypto !== "undefined" && crypto.randomUUID) return crypto.randomUUID();
@@ -496,7 +502,7 @@ function makeSocialPotato(base, invite) {
       rarity: "Message",
       sender: invite.from || "A friend",
       message: invite.message || "",
-      assetPath: "Social Potatoes/pigeon-potato-flap.gif",
+      assetPath: "Social Potatoes/pigeon-potato-flap-frame-1.png",
       pool: Math.max(base.pool, 4),
       heat: Math.max(8, base.heat - 4),
       fuse: Math.max(base.fuse, 58),
@@ -2029,7 +2035,7 @@ export default function App() {
           duration: 2100
         });
       } else {
-        setFlightFx({ id: Date.now(), type: "pass", file: old.potato.file, assetPath: old.potato.assetPath || "" });
+        setFlightFx({ id: Date.now(), type: "pass", file: old.potato.file, assetPath: old.potato.assetPath || "", socialKind: receivedKind });
       }
       if (receivedKind === "tainted") {
         enqueueFx({
@@ -2848,6 +2854,7 @@ function PotatoStage({ game, heatScore, coins, babyCry, overdriveBoost, onBadVid
   const overdriveActive = p?.power === "overdrive" && game.overdriveActive;
   const gear = p?.equipment || {};
   const potatoImage = p?.assetPath ? assetUrl(p.assetPath) : p ? assetUrl("Generic Potatoes Transparent", p.file) : "";
+  const pigeonPotato = p?.socialKind === "pigeon";
 
   useEffect(() => {
     if (!p) {
@@ -2899,9 +2906,15 @@ function PotatoStage({ game, heatScore, coins, babyCry, overdriveBoost, onBadVid
               {game.holding && <VisualShepard />}
               <HeatWisps />
               <EquipmentFx />
-              <div className="potato-sprite">
-                <img src={potatoImage} alt="Hot Potato" />
-                <BurnOverlays heatScore={heatScore} />
+              <div className={`potato-sprite ${pigeonPotato ? "pigeon-potato-sprite" : ""}`}>
+                {pigeonPotato ? (
+                  <PigeonPotatoSprite alt="Pigeon Potato" />
+                ) : (
+                  <>
+                    <img src={potatoImage} alt="Hot Potato" />
+                    <BurnOverlays heatScore={heatScore} />
+                  </>
+                )}
               </div>
               {p.equipment.foilWrap && <div className="gear-badge">Foil</div>}
               {p.equipment.ovenMitts && <div className="gear-badge mitts">Mitts</div>}
@@ -2952,6 +2965,23 @@ function BurnOverlays({ heatScore }) {
           />
         );
       })}
+    </div>
+  );
+}
+
+function PigeonPotatoSprite({ className = "", alt = "" }) {
+  return (
+    <div className={`pigeon-flap ${className}`} role={alt ? "img" : undefined} aria-label={alt || undefined}>
+      {PIGEON_FLAP_FRAMES.map((frame, index) => (
+        <img
+          key={frame}
+          className="pigeon-frame"
+          src={assetUrl("Social Potatoes", frame)}
+          alt=""
+          aria-hidden="true"
+          style={{ "--frame": index }}
+        />
+      ))}
     </div>
   );
 }
@@ -3548,7 +3578,7 @@ function MessagePotatoModal({ message, close, reply }) {
     <div className="modal show message-potato-modal">
       <div className="modal-card message-potato-card">
         <div className="message-potato-head">
-          <img src={assetUrl("Social Potatoes", "pigeon-potato-flap.gif")} alt="" />
+          <PigeonPotatoSprite className="message-pigeon-flap" />
           <div>
             <small>{message.outcome === "popped" ? "Message popped open" : "Message delivered"}</small>
             <h2>{message.from} sent a potato note</h2>
@@ -3624,6 +3654,7 @@ function FullscreenFx({ fx }) {
 
 function PotatoFlightFx({ fx }) {
   const image = fx.assetPath ? assetUrl(fx.assetPath) : assetUrl("Generic Potatoes Transparent", fx.file);
+  const pigeon = fx.socialKind === "pigeon" || /pigeon-potato/i.test(fx.assetPath || "");
   return (
     <div className={`potato-flight-fx ${fx.type}`}>
       {fx.type === "golden" && (
@@ -3635,7 +3666,7 @@ function PotatoFlightFx({ fx }) {
           </div>
         </div>
       )}
-      <img src={image} alt="" />
+      {pigeon ? <PigeonPotatoSprite className="flight-pigeon-flap" /> : <img src={image} alt="" />}
     </div>
   );
 }
