@@ -726,6 +726,7 @@ export default function App() {
   const holdDroneRef = useRef(null);
   const audioCtxRef = useRef(null);
   const audioBuffersRef = useRef(new Map());
+  const audioElementsRef = useRef(new Map());
   const noiseBuffersRef = useRef(new Map());
   const soundOnRef = useRef(true);
   const unlockedGearRef = useRef(null);
@@ -870,6 +871,12 @@ export default function App() {
     setMobileSheet(null);
     setGearOpen(false);
   }, [adModal]);
+
+  useEffect(() => {
+    if (!game.potato) return;
+    setMobileSheet(null);
+    setGearOpen(false);
+  }, [game.potato?.id]);
 
   useEffect(() => {
     if (!toast) return undefined;
@@ -1513,27 +1520,54 @@ export default function App() {
     if (!soundOnRef.current || !file) return null;
     const ctx = ensureAudio();
     const url = soundUrl(file);
-    const fallbackAudio = () => {
-      const audio = new Audio(url);
-      audio.preload = "auto";
-      audio.volume = clamp(volume, 0, 1);
-      audio.play().catch((error) => {
-        console.warn("Could not play sound asset", url, error);
+    const audio = getAssetAudio(url);
+    audio.volume = clamp(volume, 0, 1);
+    audio.muted = false;
+    try {
+      audio.pause();
+      audio.currentTime = 0;
+    } catch {
+      // Some mobile browsers reject currentTime before metadata loads.
+    }
+    const playPromise = audio.play();
+    if (playPromise?.catch) {
+      playPromise.catch((error) => {
+        console.warn("Could not play sound asset with HTML audio", url, error);
+        playSoundBuffer(url, volume, ctx);
       });
-      return audio;
+    }
+    return audio;
+  }
+
+  function getAssetAudio(url) {
+    const existing = audioElementsRef.current.get(url);
+    if (existing) return existing;
+    const audio = new Audio(url);
+    audio.preload = "auto";
+    audio.playsInline = true;
+    audioElementsRef.current.set(url, audio);
+    try {
+      audio.load();
+    } catch {
+      // Loading can be deferred by the browser; play() will try again later.
+    }
+    return audio;
+  }
+
+  function playSoundBuffer(url, volume = 0.9, ctx = ensureAudio()) {
+    if (!ctx || !url) return null;
+    const playBuffer = (buffer) => {
+      const src = ctx.createBufferSource();
+      const amp = ctx.createGain();
+      src.buffer = buffer;
+      amp.gain.setValueAtTime(clamp(volume, 0, 1), ctx.currentTime);
+      src.connect(amp).connect(ctx.destination);
+      src.start();
+      return src;
     };
+    const cached = audioBuffersRef.current.get(url);
+    if (cached?.buffer) return playBuffer(cached.buffer);
     if (ctx) {
-      const playBuffer = (buffer) => {
-        const src = ctx.createBufferSource();
-        const amp = ctx.createGain();
-        src.buffer = buffer;
-        amp.gain.setValueAtTime(clamp(volume, 0, 1), ctx.currentTime);
-        src.connect(amp).connect(ctx.destination);
-        src.start();
-        return src;
-      };
-      const cached = audioBuffersRef.current.get(url);
-      if (cached?.buffer) return playBuffer(cached.buffer);
       if (!cached?.promise) {
         const promise = fetch(url)
           .then((response) => {
@@ -1548,14 +1582,16 @@ export default function App() {
           .catch((error) => {
             audioBuffersRef.current.delete(url);
             console.warn("Could not decode sound asset", url, error);
-            fallbackAudio();
             return null;
           });
         audioBuffersRef.current.set(url, { promise });
       }
-      return fallbackAudio();
+      audioBuffersRef.current.get(url)?.promise?.then((buffer) => {
+        if (buffer) playBuffer(buffer);
+      });
+      return { pending: true };
     }
-    return fallbackAudio();
+    return null;
   }
 
   function soundGroupFiles(group) {
@@ -1594,6 +1630,7 @@ export default function App() {
     if (!soundFiles.aLotOfSpud) return;
     const url = soundUrl(soundFiles.aLotOfSpud);
     if (!url || audioBuffersRef.current.has(url)) return;
+    getAssetAudio(url);
     const ctx = ensureAudio();
     if (!ctx) return;
     const promise = fetch(url)
@@ -1619,6 +1656,7 @@ export default function App() {
     files.forEach((file) => {
       const url = soundUrl(file);
       if (!url || audioBuffersRef.current.has(url)) return;
+      getAssetAudio(url);
       const ctx = ensureAudio();
       if (!ctx) return;
       const promise = fetch(url)
@@ -1665,13 +1703,13 @@ export default function App() {
   }
 
   function announceBabyHands() {
-    enqueueFx({ type: "baby", title: "YOU HAVE", subtitle: "", note: "", duration: 1050, sfx: "baby" });
+    enqueueFx({ type: "baby", title: "YOU HAVE", subtitle: "", note: "", duration: 1200, sfx: "baby" });
     enqueueFx({
       type: "baby",
       title: "BABY HANDS",
-      subtitle: "Early passes cost double for 5 rounds.",
-      note: "Wait longer to lower the Tot fee.",
-      duration: 3300,
+      subtitle: "Early passes cost 2x Tots for 5 rounds.",
+      note: "Wait a few seconds before passing to dodge the penalty.",
+      duration: 5600,
       soundGroup: "babyVoice",
       soundVolume: 0.95
     });
