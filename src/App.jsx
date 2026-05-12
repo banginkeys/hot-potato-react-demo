@@ -713,6 +713,7 @@ export default function App() {
   const lastSoundRef = useRef({});
   const holdDroneRef = useRef(null);
   const audioCtxRef = useRef(null);
+  const audioBuffersRef = useRef(new Map());
   const noiseBuffersRef = useRef(new Map());
   const soundOnRef = useRef(true);
   const unlockedGearRef = useRef(null);
@@ -904,6 +905,13 @@ export default function App() {
     if (!activeFx) return undefined;
     const timer = setTimeout(() => setActiveFx(null), activeFx.duration || 2400);
     return () => clearTimeout(timer);
+  }, [activeFx?.id]);
+
+  useEffect(() => {
+    if (!activeFx) return;
+    if (activeFx.sfx) playSfx(activeFx.sfx, activeFx.sfxIntensity || 1);
+    if (activeFx.soundGroup) playRandomSound(activeFx.soundGroup, activeFx.soundVolume ?? 0.9);
+    if (activeFx.soundFile) playSoundFile(activeFx.soundFile, activeFx.soundVolume ?? 0.9);
   }, [activeFx?.id]);
 
   useEffect(() => {
@@ -1470,14 +1478,105 @@ export default function App() {
 
   function playSoundFile(file, volume = 0.9) {
     if (!soundOnRef.current || !file) return null;
-    ensureAudio();
-    const audio = new Audio(soundUrl(file));
-    audio.preload = "auto";
-    audio.volume = clamp(volume, 0, 1);
-    audio.play().catch((error) => {
-      console.warn("Could not play sound asset", soundUrl(file), error);
+    const ctx = ensureAudio();
+    const url = soundUrl(file);
+    const fallbackAudio = () => {
+      const audio = new Audio(url);
+      audio.preload = "auto";
+      audio.volume = clamp(volume, 0, 1);
+      audio.play().catch((error) => {
+        console.warn("Could not play sound asset", url, error);
+      });
+      return audio;
+    };
+    if (ctx) {
+      const playBuffer = (buffer) => {
+        const src = ctx.createBufferSource();
+        const amp = ctx.createGain();
+        src.buffer = buffer;
+        amp.gain.setValueAtTime(clamp(volume, 0, 1), ctx.currentTime);
+        src.connect(amp).connect(ctx.destination);
+        src.start();
+        return src;
+      };
+      const cached = audioBuffersRef.current.get(url);
+      if (cached?.buffer) return playBuffer(cached.buffer);
+      if (!cached?.promise) {
+        const promise = fetch(url)
+          .then((response) => {
+            if (!response.ok) throw new Error(`Sound HTTP ${response.status}`);
+            return response.arrayBuffer();
+          })
+          .then((data) => ctx.decodeAudioData(data.slice(0)))
+          .then((buffer) => {
+            audioBuffersRef.current.set(url, { buffer });
+            return buffer;
+          })
+          .catch((error) => {
+            audioBuffersRef.current.delete(url);
+            console.warn("Could not decode sound asset", url, error);
+            fallbackAudio();
+            return null;
+          });
+        audioBuffersRef.current.set(url, { promise });
+      }
+      audioBuffersRef.current.get(url)?.promise?.then((buffer) => {
+        if (buffer) playBuffer(buffer);
+      });
+      return { pending: true };
+    }
+    return fallbackAudio();
+  }
+
+  function warmCoreSounds() {
+    ["hotStreak", "potatoExplode", "babyVoice", "babyCry", "scary"].forEach(warmSoundGroup);
+    if (!soundFiles.aLotOfSpud) return;
+    const url = soundUrl(soundFiles.aLotOfSpud);
+    if (!url || audioBuffersRef.current.has(url)) return;
+    const ctx = ensureAudio();
+    if (!ctx) return;
+    const promise = fetch(url)
+      .then((response) => {
+        if (!response.ok) throw new Error(`Sound HTTP ${response.status}`);
+        return response.arrayBuffer();
+      })
+      .then((data) => ctx.decodeAudioData(data.slice(0)))
+      .then((buffer) => {
+        audioBuffersRef.current.set(url, { buffer });
+        return buffer;
+      })
+      .catch((error) => {
+        audioBuffersRef.current.delete(url);
+        console.warn("Could not preload sound asset", url, error);
+        return null;
+      });
+    audioBuffersRef.current.set(url, { promise });
+  }
+
+  function warmSoundGroup(group) {
+    const files = soundFiles[group] || [];
+    files.forEach((file) => {
+      const url = soundUrl(file);
+      if (!url || audioBuffersRef.current.has(url)) return;
+      const ctx = ensureAudio();
+      if (!ctx) return;
+      const promise = fetch(url)
+        .then((response) => {
+          if (!response.ok) throw new Error(`Sound HTTP ${response.status}`);
+          return response.arrayBuffer();
+        })
+        .then((data) => ctx.decodeAudioData(data.slice(0)))
+        .then((buffer) => {
+          audioBuffersRef.current.set(url, { buffer });
+          return buffer;
+        })
+        .catch((error) => {
+          audioBuffersRef.current.delete(url);
+          console.warn("Could not preload sound asset", url, error);
+          return null;
+        });
+      audioBuffersRef.current.set(url, { promise });
     });
-    return audio;
   }
 
   function announceHotStreak(streak, power) {
@@ -1487,9 +1586,10 @@ export default function App() {
       title: "HOT STREAK",
       subtitle: `Streak ${streak} unlocked ${powerName(power)} next.`,
       note: "Your next Hot Potato gets a surprise power run.",
-      duration: 5400
+      duration: 5400,
+      soundGroup: "hotStreak",
+      soundVolume: 0.94
     });
-    playRandomSound("hotStreak", 0.94);
   }
 
   function announcePower(power, streak) {
@@ -1504,16 +1604,16 @@ export default function App() {
   }
 
   function announceBabyHands() {
-    playSfx("baby");
-    enqueueFx({ type: "baby", title: "YOU HAVE", subtitle: "", note: "", duration: 1050 });
+    enqueueFx({ type: "baby", title: "YOU HAVE", subtitle: "", note: "", duration: 1050, sfx: "baby" });
     enqueueFx({
       type: "baby",
       title: "BABY HANDS",
       subtitle: "Early passes cost double for 5 rounds.",
       note: "Wait longer to lower the Tot fee.",
-      duration: 3300
+      duration: 3300,
+      soundGroup: "babyVoice",
+      soundVolume: 0.95
     });
-    playRandomSound("babyVoice", 0.95);
   }
 
   function register(name) {
@@ -1539,6 +1639,7 @@ export default function App() {
   function connect() {
     clearFx();
     playSfx("connect");
+    warmCoreSounds();
     if (!validUsername(game.playerName)) {
       playSfx("error");
       setGame((old) => ({ ...old, onboarded: false }));
@@ -1603,6 +1704,7 @@ export default function App() {
     setGame((old) => ({ ...old, soundOn: nextSound }));
     if (nextSound) {
       playSfx("connect");
+      warmCoreSounds();
       if (game.holding && game.potato) startHoldDrone();
       showToast("Sound on.");
     } else {

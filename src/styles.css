@@ -3010,13 +3010,22 @@ button {
 
 .panel,
 .stage,
-.toast,
 .modal-card {
   border: 2px solid var(--line);
   border-radius: 26px;
   background: var(--panel);
   box-shadow: var(--shadow);
   backdrop-filter: blur(16px);
+}
+
+.toast {
+  border: 2px solid rgba(126, 239, 255, 0.75);
+  background:
+    radial-gradient(circle at 86% 18%, rgba(255, 230, 99, 0.32), transparent 3.4rem),
+    linear-gradient(135deg, rgba(18, 95, 146, 0.96), rgba(49, 18, 104, 0.96));
+  color: #ffffff;
+  text-shadow: 0 2px 8px rgba(14, 6, 36, 0.42);
+  backdrop-filter: blur(14px);
 }
 
 .panel {
