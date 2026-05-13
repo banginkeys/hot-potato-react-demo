@@ -16,13 +16,13 @@ export async function handler(event) {
     const username = cleanText(body.username, 24);
     const recoveryCode = cleanRecoveryCode(body.recoveryCode);
     const recoveryHash = hashRecoveryCode(recoveryCode);
-    if (!username || !recoveryHash) return json(400, { error: "Enter your username and Farm Code." });
+    if (!username || !recoveryHash) return json(400, { error: "Enter your username and Secret Recipe." });
 
     const result = await findPlayerForLogin(username);
     if (!result.configured) return json(503, { error: "Player backend is not configured yet." });
     const player = result.player;
     if (!player || player.recovery_code_hash !== recoveryHash) {
-      return json(401, { error: "That username and Farm Code did not match." });
+      return json(401, { error: "That username and Secret Recipe did not match." });
     }
 
     await upsertPlayer({

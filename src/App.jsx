@@ -101,10 +101,24 @@ const DELIVERY_BACKSTOP_MS = 34000;
 const SOCIAL_DELIVERY_DELAY_MS = 650;
 const SOCIAL_INBOX_POLL_MS = 1500;
 const PLAYER_PROFILE_KEY = `${SAVE_KEY}-player-id`;
-const PLAYER_CODE_KEY = `${SAVE_KEY}-farm-code`;
+const PLAYER_CODE_KEY = `${SAVE_KEY}-secret-recipe`;
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const GUIDE_KEYS = ["connect", "watchAd", "fundRisk", "fundFromSac", "waitPotato", "pass", "moveSac", "sponsorBreak", "equipment"];
-const FARM_CODE_ALPHABET = "23456789ABCDEFGHJKLMNPQRSTUVWXYZ";
+const SECRET_RECIPE_LENGTH = 3;
+const SECRET_RECIPE_TILES = [
+  { id: "potato", icon: "🥔", label: "Potato" },
+  { id: "carrot", icon: "🥕", label: "Carrot" },
+  { id: "corn", icon: "🌽", label: "Corn" },
+  { id: "pie", icon: "🥧", label: "Pie" },
+  { id: "egg", icon: "🥚", label: "Egg" },
+  { id: "milk", icon: "🥛", label: "Milk" },
+  { id: "cow", icon: "🐄", label: "Cow" },
+  { id: "chicken", icon: "🐔", label: "Chicken" },
+  { id: "pig", icon: "🐖", label: "Pig" },
+  { id: "sheep", icon: "🐑", label: "Sheep" }
+];
+const SECRET_RECIPE_IDS = new Set(SECRET_RECIPE_TILES.map((tile) => tile.id));
+const SECRET_RECIPE_BY_ID = Object.fromEntries(SECRET_RECIPE_TILES.map((tile) => [tile.id, tile]));
 const PIGEON_FLAP_FRAMES = [
   "pigeon-potato-flap-frame-1.png",
   "pigeon-potato-flap-frame-2.png",
@@ -133,31 +147,56 @@ function getOrCreatePlayerId() {
   return created;
 }
 
-function makeFarmCode() {
-  let code = "";
-  const bytes = new Uint8Array(6);
+function secretRecipeParts(value) {
+  const raw = Array.isArray(value) ? value : String(value || "").toLowerCase().split(/[^a-z]+/g);
+  return raw.map((part) => String(part || "").trim()).filter((part) => SECRET_RECIPE_IDS.has(part)).slice(0, SECRET_RECIPE_LENGTH);
+}
+
+function cleanSecretRecipe(value) {
+  return secretRecipeParts(value).join("-");
+}
+
+function makeSecretRecipe() {
+  const parts = [];
+  const bytes = new Uint8Array(SECRET_RECIPE_LENGTH);
   if (typeof crypto !== "undefined" && crypto.getRandomValues) {
     crypto.getRandomValues(bytes);
   } else {
     for (let i = 0; i < bytes.length; i += 1) bytes[i] = Math.floor(Math.random() * 256);
   }
   for (let i = 0; i < bytes.length; i += 1) {
-    code += FARM_CODE_ALPHABET[bytes[i] % FARM_CODE_ALPHABET.length];
+    parts.push(SECRET_RECIPE_TILES[bytes[i] % SECRET_RECIPE_TILES.length].id);
   }
-  return code;
+  return cleanSecretRecipe(parts);
 }
 
-function cleanFarmCode(value) {
-  return String(value || "").toUpperCase().replace(/[^A-Z0-9]/g, "").slice(0, 12);
+function secretRecipeComplete(value) {
+  return secretRecipeParts(value).length === SECRET_RECIPE_LENGTH;
 }
 
-function getOrCreateFarmCode() {
-  if (typeof localStorage === "undefined") return makeFarmCode();
-  const existing = cleanFarmCode(localStorage.getItem(PLAYER_CODE_KEY));
-  if (existing.length >= 4) return existing;
-  const created = makeFarmCode();
+function getOrCreateSecretRecipe() {
+  if (typeof localStorage === "undefined") return makeSecretRecipe();
+  const existing = cleanSecretRecipe(localStorage.getItem(PLAYER_CODE_KEY));
+  if (secretRecipeComplete(existing)) return existing;
+  const created = makeSecretRecipe();
   localStorage.setItem(PLAYER_CODE_KEY, created);
   return created;
+}
+
+function secretRecipeTile(id) {
+  return SECRET_RECIPE_BY_ID[id] || null;
+}
+
+function secretRecipeLabel(value) {
+  const parts = secretRecipeParts(value);
+  if (!parts.length) return "Not set";
+  return parts.map((id) => secretRecipeTile(id)?.icon || "?").join(" ");
+}
+
+function secretRecipeNames(value) {
+  const parts = secretRecipeParts(value);
+  if (!parts.length) return "Not set";
+  return parts.map((id) => secretRecipeTile(id)?.label || id).join(" + ");
 }
 
 function displayHandle(player) {
@@ -440,7 +479,7 @@ function gameStateForBackend(game) {
   };
 }
 
-function gameFromBackendProfile(player, farmCode) {
+function gameFromBackendProfile(player, secretRecipe) {
   const saved = player?.gameState && typeof player.gameState === "object" ? player.gameState : {};
   const restored = {
     ...initialGame,
@@ -449,7 +488,7 @@ function gameFromBackendProfile(player, farmCode) {
     connected: true,
     playerId: coercePlayerId(player?.id) || getOrCreatePlayerId(),
     playerHandle: player?.handle || "",
-    profileCode: cleanFarmCode(farmCode),
+    profileCode: cleanSecretRecipe(secretRecipe),
     playerName: cleanUsername(player?.username || saved.playerName || "").trim(),
     avatar: Number(player?.avatarId ?? player?.avatar_id ?? saved.avatar ?? 0) || 0,
     wallet: player?.wallet || "0xSPUD...DEMO",
@@ -522,7 +561,7 @@ async function upsertBackendPlayer(game) {
       username: cleanUsername(game.playerName).trim(),
       avatarId: game.avatar || 0,
       wallet: game.wallet || "",
-      recoveryCode: cleanFarmCode(game.profileCode),
+      recoveryCode: cleanSecretRecipe(game.profileCode),
       gameState: gameStateForBackend(game)
     })
   });
@@ -535,7 +574,7 @@ async function loginBackendPlayer(username, recoveryCode) {
     headers: { "content-type": "application/json" },
     body: JSON.stringify({
       username: cleanUsername(username).trim(),
-      recoveryCode: cleanFarmCode(recoveryCode)
+      recoveryCode: cleanSecretRecipe(recoveryCode)
     })
   });
   return parseBackendResponse(response, "Could not restore that player.");
@@ -688,13 +727,13 @@ function goalRewardCopy(goal) {
 function loadGame() {
   try {
     const raw = localStorage.getItem(SAVE_KEY);
-    if (!raw) return { ...initialGame, playerId: getOrCreatePlayerId(), profileCode: getOrCreateFarmCode() };
+    if (!raw) return { ...initialGame, playerId: getOrCreatePlayerId(), profileCode: getOrCreateSecretRecipe() };
     const loaded = JSON.parse(raw);
     return {
       ...initialGame,
       ...loaded,
       playerId: coercePlayerId(loaded.playerId) || getOrCreatePlayerId(),
-      profileCode: cleanFarmCode(loaded.profileCode) || getOrCreateFarmCode(),
+      profileCode: cleanSecretRecipe(loaded.profileCode) || getOrCreateSecretRecipe(),
       tipsEnabled: loaded.tipsEnabled ?? !!loaded.onboarded,
       holding: false,
       potato: null,
@@ -705,7 +744,7 @@ function loadGame() {
       unlocked: { ...initialGame.unlocked, ...(loaded.unlocked || {}) }
     };
   } catch {
-    return { ...initialGame, playerId: getOrCreatePlayerId(), profileCode: getOrCreateFarmCode() };
+    return { ...initialGame, playerId: getOrCreatePlayerId(), profileCode: getOrCreateSecretRecipe() };
   }
 }
 
@@ -1899,7 +1938,7 @@ export default function App() {
       showToast("Pick a unique username first.");
       return;
     }
-    const profileCode = cleanFarmCode(game.profileCode) || getOrCreateFarmCode();
+    const profileCode = cleanSecretRecipe(game.profileCode) || getOrCreateSecretRecipe();
     if (typeof localStorage !== "undefined") localStorage.setItem(PLAYER_CODE_KEY, profileCode);
     const nextGame = {
       ...game,
@@ -1926,14 +1965,14 @@ export default function App() {
     showToast(takeTour ? `Welcome, ${playerName}. The farm tour is on.` : `Welcome, ${playerName}. Tour skipped.`);
   }
 
-  async function restoreProfile(username, farmCode) {
+  async function restoreProfile(username, secretRecipe) {
     clearFx();
     playSfx("tap");
     const cleanName = cleanUsername(username).trim();
-    const cleanCode = cleanFarmCode(farmCode);
-    if (!validUsername(cleanName) || cleanCode.length < 4) {
+    const cleanCode = cleanSecretRecipe(secretRecipe);
+    if (!validUsername(cleanName) || !secretRecipeComplete(cleanCode)) {
       playSfx("error");
-      showToast("Enter your username and Farm Code.");
+      showToast("Enter your username and Secret Recipe.");
       return false;
     }
     try {
@@ -1969,7 +2008,7 @@ export default function App() {
         ...initialGame,
         onboarded: old.onboarded,
         playerId: coercePlayerId(old.playerId) || getOrCreatePlayerId(),
-        profileCode: cleanFarmCode(old.profileCode) || getOrCreateFarmCode(),
+        profileCode: cleanSecretRecipe(old.profileCode) || getOrCreateSecretRecipe(),
         tipsEnabled: !!old.tipsEnabled,
         playerName: cleanUsername(old.playerName).trim(),
         avatar: old.avatar,
@@ -1995,7 +2034,7 @@ export default function App() {
     localStorage.removeItem(SAVE_KEY);
     localStorage.removeItem(PLAYER_CODE_KEY);
     clearSocialInviteUrl();
-    setGame({ ...initialGame, playerId: getOrCreatePlayerId(), profileCode: getOrCreateFarmCode() });
+    setGame({ ...initialGame, playerId: getOrCreatePlayerId(), profileCode: getOrCreateSecretRecipe() });
     setMobileSheet(null);
     setGearOpen(false);
     setAdModal(null);
@@ -2011,7 +2050,7 @@ export default function App() {
       ...initialGame,
       onboarded: old.onboarded,
       playerId: coercePlayerId(old.playerId) || getOrCreatePlayerId(),
-      profileCode: cleanFarmCode(old.profileCode) || getOrCreateFarmCode(),
+      profileCode: cleanSecretRecipe(old.profileCode) || getOrCreateSecretRecipe(),
       tipsEnabled: true,
       playerName: cleanUsername(old.playerName).trim(),
       avatar: old.avatar,
@@ -2924,9 +2963,10 @@ function WalletPanel({
       <h2>Wallet</h2>
       <div className="tiny">{game.wallet || "Not connected"}</div>
       {game.onboarded && (
-        <details className="farm-code-pocket">
-          <summary>Farm Code</summary>
-          <strong>{cleanFarmCode(game.profileCode) || "Not set"}</strong>
+        <details className="recipe-pocket">
+          <summary>Secret Recipe</summary>
+          <SecretRecipeSummary value={game.profileCode} />
+          <strong>{secretRecipeNames(game.profileCode)}</strong>
           <span>Use this with your username to restore this test player.</span>
         </details>
       )}
@@ -3869,23 +3909,86 @@ function EconomyPulse({ game }) {
   );
 }
 
+function SecretRecipeSummary({ value }) {
+  const parts = secretRecipeParts(value);
+  return (
+    <div className="recipe-summary" aria-label={`Secret Recipe: ${secretRecipeNames(value)}`}>
+      {Array.from({ length: SECRET_RECIPE_LENGTH }, (_, index) => {
+        const tile = secretRecipeTile(parts[index]);
+        return (
+          <span key={`${tile?.id || "empty"}-${index}`} className={tile ? "" : "empty"}>
+            {tile?.icon || "?"}
+          </span>
+        );
+      })}
+    </div>
+  );
+}
+
+function recipeSlots(value) {
+  const slots = Array.isArray(value) ? value.slice(0, SECRET_RECIPE_LENGTH) : secretRecipeParts(value);
+  while (slots.length < SECRET_RECIPE_LENGTH) slots.push("");
+  return slots.map((slot) => (SECRET_RECIPE_IDS.has(slot) ? slot : ""));
+}
+
+function SecretRecipePicker({ value, onChange, compact = false }) {
+  const [activeSlot, setActiveSlot] = useState(0);
+  const slots = recipeSlots(value);
+
+  function pickTile(id) {
+    const nextSlots = slots.slice();
+    nextSlots[activeSlot] = id;
+    onChange(nextSlots);
+    setActiveSlot((activeSlot + 1) % SECRET_RECIPE_LENGTH);
+  }
+
+  return (
+    <div className={`recipe-picker ${compact ? "compact" : ""}`}>
+      <div className="recipe-slots" aria-label="Selected Secret Recipe">
+        {slots.map((id, index) => {
+          const tile = secretRecipeTile(id);
+          return (
+            <button
+              key={`slot-${index}`}
+              type="button"
+              className={index === activeSlot ? "active" : ""}
+              onClick={() => setActiveSlot(index)}
+            >
+              <small>{index + 1}</small>
+              <span>{tile?.icon || "?"}</span>
+            </button>
+          );
+        })}
+      </div>
+      <div className="recipe-tile-grid">
+        {SECRET_RECIPE_TILES.map((tile) => (
+          <button key={tile.id} type="button" onClick={() => pickTile(tile.id)}>
+            <span>{tile.icon}</span>
+            <small>{tile.label}</small>
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 function OnboardingModal({ game, setGame, completeOnboarding, restoreProfile }) {
   const [mode, setMode] = useState("create");
   const [step, setStep] = useState("profile");
   const [loginName, setLoginName] = useState("");
-  const [loginCode, setLoginCode] = useState("");
+  const [loginRecipe, setLoginRecipe] = useState(["", "", ""]);
   const [status, setStatus] = useState("");
   const avatar = avatars[game.avatar] || avatars[0];
-  const profileCode = cleanFarmCode(game.profileCode) || getOrCreateFarmCode();
+  const profileCode = cleanSecretRecipe(game.profileCode) || getOrCreateSecretRecipe();
 
   useEffect(() => {
-    if (!game.profileCode) setGame((old) => ({ ...old, profileCode }));
+    if (!secretRecipeComplete(game.profileCode)) setGame((old) => ({ ...old, profileCode }));
   }, [game.profileCode, profileCode, setGame]);
 
   async function submitLogin() {
     setStatus("Looking for your potato patch...");
-    const ok = await restoreProfile(loginName, loginCode);
-    if (!ok) setStatus("That username and Farm Code did not match.");
+    const ok = await restoreProfile(loginName, cleanSecretRecipe(loginRecipe));
+    if (!ok) setStatus("That username and Secret Recipe did not match.");
   }
 
   if (mode === "login") {
@@ -3893,7 +3996,7 @@ function OnboardingModal({ game, setGame, completeOnboarding, restoreProfile }) 
       <div className="modal show">
         <div className="modal-card onboarding-card login-card">
           <h2>Find Your Player</h2>
-          <p className="onboarding-note">Use your username and Farm Code to get back your saved profile, friends, and SPUD.</p>
+          <p className="onboarding-note">Use your username and Secret Recipe to get back your saved profile, friends, and SPUD.</p>
           <label>
             Username
             <input
@@ -3903,17 +4006,12 @@ function OnboardingModal({ game, setGame, completeOnboarding, restoreProfile }) 
               onChange={(e) => setLoginName(cleanUsername(e.target.value))}
             />
           </label>
-          <label>
-            Farm Code
-            <input
-              value={loginCode}
-              placeholder="ABC123"
-              maxLength={12}
-              onChange={(e) => setLoginCode(cleanFarmCode(e.target.value))}
-            />
-          </label>
+          <div className="recipe-login-block">
+            <small>Pick your 3-picture Secret Recipe in order.</small>
+            <SecretRecipePicker value={loginRecipe} onChange={setLoginRecipe} compact />
+          </div>
           {status && <p className="login-status">{status}</p>}
-          <button className="green" onClick={submitLogin} disabled={!validUsername(loginName) || cleanFarmCode(loginCode).length < 4}>Log Back In</button>
+          <button className="green" onClick={submitLogin} disabled={!validUsername(loginName) || !secretRecipeComplete(loginRecipe)}>Log Back In</button>
           <button className="ghost" onClick={() => { setMode("create"); setStatus(""); }}>Make a New Player</button>
         </div>
       </div>
@@ -3927,7 +4025,7 @@ function OnboardingModal({ game, setGame, completeOnboarding, restoreProfile }) 
           <h2>Tour the Potato Farm?</h2>
           <div className="onboarding-preview">
             <div className="avatar large"><img src={assetUrl("Avatars", avatar.file)} alt="" /></div>
-            <div><strong>{game.playerName || "Your Name"}</strong><span>Farm Code {profileCode}</span></div>
+            <div><strong>{game.playerName || "Your Name"}</strong><span>Secret Recipe {secretRecipeLabel(profileCode)}</span></div>
           </div>
           <p className="onboarding-note">The tour points at each button the first time you need it. You can replay tips later from the top bar.</p>
           <div className="tour-actions">
@@ -3962,16 +4060,20 @@ function OnboardingModal({ game, setGame, completeOnboarding, restoreProfile }) 
             onChange={(e) => setGame((old) => ({ ...old, playerName: cleanUsername(e.target.value) }))}
           />
         </label>
-        <div className="farm-code-card">
-          <small>Your Farm Code</small>
-          <strong>{profileCode}</strong>
-          <span>No password for now. This code lets you recover this player after clearing cookies.</span>
+        <div className="recipe-card">
+          <small>Your Secret Recipe</small>
+          <SecretRecipeSummary value={profileCode} />
+          <span>Pick three pictures in order. This lets you recover this test player after clearing cookies.</span>
+          <SecretRecipePicker
+            value={profileCode}
+            onChange={(nextSlots) => setGame((old) => ({ ...old, profileCode: cleanSecretRecipe(nextSlots) }))}
+          />
           <button
             className="ghost mini-action"
             type="button"
-            onClick={() => setGame((old) => ({ ...old, profileCode: makeFarmCode() }))}
+            onClick={() => setGame((old) => ({ ...old, profileCode: makeSecretRecipe() }))}
           >
-            New Code
+            Random Recipe
           </button>
         </div>
         <div className="avatar-picker">
