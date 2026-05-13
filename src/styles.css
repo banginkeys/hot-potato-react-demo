@@ -868,6 +868,52 @@ small {
   transform: scale(1.04);
 }
 
+.potato-sprite.mitts-potato-sprite {
+  width: 144%;
+  height: 144%;
+  overflow: visible;
+  transform: translateY(4%);
+}
+
+.oven-mitts-held-sprite {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  transform-origin: 50% 58%;
+  pointer-events: none;
+}
+
+.oven-mitts-held-sprite > img {
+  position: relative;
+  z-index: 2;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  user-select: none;
+  pointer-events: none;
+  filter:
+    brightness(clamp(0.7, calc(1.04 - var(--heat) * 0.22), 1.04))
+    sepia(clamp(0, calc(var(--heat) * 0.2), 0.26))
+    saturate(calc(1.02 + var(--heat) * 0.32))
+    contrast(calc(1 + var(--heat) * 0.12))
+    drop-shadow(0 18px 23px rgba(119, 35, 10, calc(0.18 + var(--heat) * 0.12)));
+  transition: filter 420ms ease;
+  will-change: filter;
+}
+
+.potato-wrap.hot .oven-mitts-held-sprite > img {
+  filter:
+    brightness(clamp(0.64, calc(1.06 - var(--heat) * 0.28), 1.06))
+    sepia(clamp(0.04, calc(var(--heat) * 0.32), 0.38))
+    saturate(calc(1.08 + var(--heat) * 0.48))
+    contrast(calc(1 + var(--heat) * 0.2))
+    drop-shadow(0 22px 26px rgba(119, 35, 10, 0.32));
+}
+
+.oven-mitts-held-sprite .burn-overlays {
+  inset: 13% 18% 18%;
+}
+
 .pigeon-flap {
   position: relative;
   z-index: 2;

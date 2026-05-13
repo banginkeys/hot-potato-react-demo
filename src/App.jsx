@@ -3428,9 +3428,11 @@ function PotatoStage({ game, heatScore, coins, babyCry, overdriveBoost, onBadVid
               {game.holding && <VisualShepard />}
               <HeatWisps />
               <EquipmentFx gear={gear} />
-              <div className={`potato-sprite ${pigeonPotato ? "pigeon-potato-sprite" : ""}`}>
+              <div className={`potato-sprite ${pigeonPotato ? "pigeon-potato-sprite" : ""} ${gear.ovenMitts && !pigeonPotato ? "mitts-potato-sprite" : ""}`}>
                 {pigeonPotato ? (
                   <PigeonPotatoSprite alt="Pigeon Potato" />
+                ) : gear.ovenMitts ? (
+                  <OvenMittsPotatoSprite heatScore={heatScore} />
                 ) : (
                   <>
                     <img src={potatoImage} alt="Hot Potato" />
@@ -3489,6 +3491,16 @@ function BurnOverlays({ heatScore }) {
   );
 }
 
+function OvenMittsPotatoSprite({ heatScore }) {
+  const mittsPotato = assetUrl("Equipment", "oven-mitts-painted-held-cutout.png");
+  return (
+    <div className="oven-mitts-held-sprite">
+      <img src={mittsPotato} alt="Hot Potato held with Oven Mitts" />
+      <BurnOverlays heatScore={heatScore} />
+    </div>
+  );
+}
+
 function PigeonPotatoSprite({ className = "", alt = "" }) {
   return (
     <div className={`pigeon-flap ${className}`} role={alt ? "img" : undefined} aria-label={alt || undefined}>
@@ -3525,10 +3537,6 @@ function EquipmentStatus({ gear }) {
 function EquipmentFx({ gear = {} }) {
   return (
     <>
-      <div key={`mitts-${gear.ovenMittsFx || Number(!!gear.ovenMitts)}`} className="equipment-fx mitts-fx" aria-hidden="true">
-        <span className="oven-mitt left"><i /><b /></span>
-        <span className="oven-mitt right"><i /><b /></span>
-      </div>
       <div key={`sauce-${gear.hotSauceFx || gear.hotSauceSquirts || 0}`} className="equipment-tool-fx hot-sauce-tool-fx" aria-hidden="true">
         <img src={assetUrl("Equipment", "hot-sauce-bottle.svg")} alt="" />
         <span className="sauce-stream" />
