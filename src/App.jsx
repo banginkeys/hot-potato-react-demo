@@ -3497,7 +3497,7 @@ function HeatWisps() {
   );
 }
 
-function PlayableAdVideo({ file, soundOn, loop = false, onBadVideo }) {
+function PlayableAdVideo({ file, soundOn, loop = false, onBadVideo, onVisualReady }) {
   const videoRef = useRef(null);
   const [loadState, setLoadState] = useState("loading");
 
@@ -3526,7 +3526,10 @@ function PlayableAdVideo({ file, soundOn, loop = false, onBadVideo }) {
   function markLoadable() {
     const video = videoRef.current;
     if (!video || !file) return;
-    if (video.videoWidth > 0 && video.videoHeight > 0) setLoadState("playing");
+    if (video.videoWidth > 0 && video.videoHeight > 0) {
+      setLoadState("playing");
+      onVisualReady?.(file);
+    }
   }
 
   function markBad() {
@@ -4254,15 +4257,27 @@ function OnboardingModal({ game, setGame, completeOnboarding, restoreProfile }) 
 
 function AdModal({ game, file, adReady, claimAd, close, onBadVideo }) {
   const payout = rewardedAdPayout(game.ads);
+  const [visualReady, setVisualReady] = useState(false);
+  const canClaim = adReady && visualReady;
+
+  useEffect(() => {
+    setVisualReady(false);
+  }, [file]);
+
   return (
-    <div className="modal show">
-      <div className="modal-card">
+    <div className="modal show rewarded-ad-modal">
+      <div className="modal-card rewarded-ad-card">
         <h2>Rewarded Ad</h2>
         <div className="ad-frame">
-          <PlayableAdVideo file={file} soundOn={game.soundOn} onBadVideo={onBadVideo} />
+          <PlayableAdVideo
+            file={file}
+            soundOn={game.soundOn}
+            onBadVideo={onBadVideo}
+            onVisualReady={() => setVisualReady(true)}
+          />
         </div>
-        <p>{adReady ? "Ad complete." : "Ad playing..."}</p>
-        <button className="green" onClick={claimAd} disabled={!adReady}>Claim +{payout.tots} Tots</button>
+        <p>{canClaim ? "Ad complete." : visualReady ? "Ad playing..." : "Loading sponsor video..."}</p>
+        <button className="green" onClick={claimAd} disabled={!canClaim}>Claim +{payout.tots} Tots</button>
         <button className="ghost" onClick={close}>Close</button>
         <p className="ad-pace-note">Reward pace: {payout.tier}. Fresh ad views pay the most Tots.</p>
       </div>

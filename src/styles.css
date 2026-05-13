@@ -2264,6 +2264,10 @@ small {
 }
 
 .ad-frame {
+  position: relative;
+  display: block;
+  width: 100%;
+  min-height: 170px;
   overflow: hidden;
   border-radius: 20px;
   background: #111;
@@ -2271,6 +2275,8 @@ small {
 
 .ad-video-shell {
   position: relative;
+  width: 100%;
+  height: 100%;
   overflow: hidden;
   min-height: 170px;
   border-radius: inherit;
@@ -2285,6 +2291,60 @@ small {
   display: block;
   aspect-ratio: 16 / 9;
   object-fit: contain;
+}
+
+.rewarded-ad-card {
+  width: min(640px, calc(100vw - 24px));
+  max-height: calc(100dvh - 24px);
+  overflow: hidden;
+  gap: 0.68rem;
+}
+
+.rewarded-ad-card h2,
+.rewarded-ad-card p {
+  margin: 0;
+}
+
+.rewarded-ad-card .ad-frame {
+  height: clamp(160px, 44dvh, 340px);
+  min-height: 0;
+  box-shadow: inset 0 0 0 2px rgba(255, 255, 255, 0.12);
+}
+
+.rewarded-ad-card .ad-video-shell {
+  min-height: 0;
+}
+
+.rewarded-ad-card .ad-frame video {
+  position: absolute;
+  inset: 0;
+  height: 100%;
+}
+
+.rewarded-ad-card button {
+  min-height: 46px;
+  padding-block: 0.65rem;
+}
+
+@media (max-height: 560px) {
+  .rewarded-ad-card {
+    gap: 0.48rem;
+    padding: 0.78rem;
+    border-radius: 22px;
+  }
+
+  .rewarded-ad-card .ad-frame {
+    height: clamp(128px, 43dvh, 210px);
+  }
+
+  .rewarded-ad-card button {
+    min-height: 40px;
+    padding-block: 0.48rem;
+  }
+
+  .rewarded-ad-card .ad-pace-note {
+    display: none;
+  }
 }
 
 .ad-video-status {
