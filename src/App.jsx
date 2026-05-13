@@ -2,6 +2,7 @@ import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import {
   SAVE_KEY,
   SPUD,
+  OVEN_MITTS_HELD_POTATO_FILE,
   adFiles,
   assetUrl,
   avatars,
@@ -3366,6 +3367,7 @@ function PotatoStage({ game, heatScore, coins, babyCry, overdriveBoost, onBadVid
   const sizzlePercent = sizzleMeterPercent(p, game.holding);
   const potatoImage = p?.assetPath ? assetUrl(p.assetPath) : p ? assetUrl("Generic Potatoes Transparent", p.file) : "";
   const pigeonPotato = p?.socialKind === "pigeon";
+  const paintedOvenMitts = !!gear.ovenMitts && !pigeonPotato && p?.file === OVEN_MITTS_HELD_POTATO_FILE;
   const emptyInfo = !p ? emptyStageInfo(game) : null;
   const emptyAction = () => {
     if (!emptyInfo?.action) return;
@@ -3428,10 +3430,10 @@ function PotatoStage({ game, heatScore, coins, babyCry, overdriveBoost, onBadVid
               {game.holding && <VisualShepard />}
               <HeatWisps />
               <EquipmentFx gear={gear} />
-              <div className={`potato-sprite ${pigeonPotato ? "pigeon-potato-sprite" : ""} ${gear.ovenMitts && !pigeonPotato ? "mitts-potato-sprite" : ""}`}>
+              <div className={`potato-sprite ${pigeonPotato ? "pigeon-potato-sprite" : ""} ${paintedOvenMitts ? "mitts-potato-sprite" : ""}`}>
                 {pigeonPotato ? (
                   <PigeonPotatoSprite alt="Pigeon Potato" />
-                ) : gear.ovenMitts ? (
+                ) : paintedOvenMitts ? (
                   <OvenMittsPotatoSprite heatScore={heatScore} />
                 ) : (
                   <>

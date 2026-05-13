@@ -95,8 +95,10 @@ const fallbackAvatars = [
 export const avatars = (manifest.avatars?.length ? manifest.avatars : fallbackAvatars)
   .map((file, id) => ({ id, name: avatarNames[file] || file.replace(/\.[^.]+$/, ""), file }));
 
+export const OVEN_MITTS_HELD_POTATO_FILE = "21bb252d-7af3-496b-a597-52c48360d5b6.png";
+
 const fallbackPotatoFiles = [
-  "21bb252d-7af3-496b-a597-52c48360d5b6.png",
+  OVEN_MITTS_HELD_POTATO_FILE,
   "2fc92bf1-5242-451d-abf4-15bc120e9b2d (1).png",
   "2fc92bf1-5242-451d-abf4-15bc120e9b2d.png",
   "34c503af-22ef-4fd3-8338-d62746bb68ed.png",
