@@ -180,6 +180,30 @@ export async function findPlayerByUsername(username = "") {
   ) || null;
 }
 
+export async function findPlayerForLogin(username = "") {
+  const config = envConfig();
+  if (!config.configured) return { configured: false, player: null };
+  const name = String(username || "").trim();
+  if (!name) return { configured: true, player: null };
+
+  const params = new URLSearchParams({
+    select: "id,username,handle,avatar_id,wallet,last_seen_at,recovery_code_hash,game_state",
+    username: `ilike.${name}`,
+    limit: "5"
+  });
+  const response = await fetch(`${config.url}/rest/v1/${playersTable}?${params}`, {
+    headers: headers(config.serviceRoleKey)
+  });
+  const body = await response.json().catch(() => null);
+  if (!response.ok) {
+    throw new Error(body?.message || "Could not find player profile.");
+  }
+  const player = (Array.isArray(body) ? body : []).find((record) =>
+    String(record.username || "").trim().toLowerCase() === name.toLowerCase()
+  ) || null;
+  return { configured: true, player };
+}
+
 export async function searchPlayersByUsername(query = "", excludeId = "") {
   const config = envConfig();
   if (!config.configured) return { configured: false, players: [] };
@@ -308,19 +332,34 @@ export async function listIncomingSocialPotatoes(handle = "") {
   const target = String(handle || "").trim();
   if (!target) return { configured: true, potatoes: [] };
 
-  const params = new URLSearchParams({
-    target_handle: `eq.${target}`,
-    claimed_at: "is.null",
-    select: "id,kind,from_name,target_handle,target_name,message,created_at",
+  const select = "id,kind,from_name,target_handle,target_name,message,created_at";
+  const fetchIncoming = async (extra = {}) => {
+    const params = new URLSearchParams({
+      target_handle: `eq.${target}`,
+      claimed_at: "is.null",
+      select,
+      ...extra
+    });
+    const response = await fetch(`${config.url}/rest/v1/${socialTable}?${params}`, {
+      headers: headers(config.serviceRoleKey)
+    });
+    const body = await response.json().catch(() => null);
+    if (!response.ok) {
+      throw new Error(body?.message || "Could not list incoming social potatoes.");
+    }
+    return Array.isArray(body) ? body : [];
+  };
+
+  const special = await fetchIncoming({
+    kind: "in.(tainted,golden,pigeon)",
+    order: "created_at.asc",
+    limit: "10"
+  });
+  const normal = await fetchIncoming({
+    kind: "eq.normal",
     order: "created_at.asc",
     limit: "5"
   });
-  const response = await fetch(`${config.url}/rest/v1/${socialTable}?${params}`, {
-    headers: headers(config.serviceRoleKey)
-  });
-  const body = await response.json().catch(() => null);
-  if (!response.ok) {
-    throw new Error(body?.message || "Could not list incoming social potatoes.");
-  }
-  return { configured: true, potatoes: Array.isArray(body) ? body : [] };
+
+  return { configured: true, potatoes: [...special, ...normal] };
 }

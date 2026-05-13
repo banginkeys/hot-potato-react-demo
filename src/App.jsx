@@ -25,9 +25,11 @@ import {
 
 const initialGame = {
   onboarded: false,
+  tipsEnabled: false,
   connected: false,
   playerId: "",
   playerHandle: "",
+  profileCode: "",
   soundOn: true,
   playerName: "",
   avatar: 0,
@@ -89,17 +91,20 @@ const initialGame = {
   log: []
 };
 
-const ACTIVE_DELIVERY_MIN_MS = 4500;
-const ACTIVE_DELIVERY_RANGE_MS = 4500;
-const POST_PASS_DELIVERY_MIN_MS = 3600;
-const POST_PASS_DELIVERY_RANGE_MS = 4200;
-const READY_DELIVERY_MIN_MS = 1200;
-const READY_DELIVERY_RANGE_MS = 1800;
-const DELIVERY_BACKSTOP_MS = 8500;
+const ACTIVE_DELIVERY_MIN_MS = 18000;
+const ACTIVE_DELIVERY_RANGE_MS = 14000;
+const POST_PASS_DELIVERY_MIN_MS = 14000;
+const POST_PASS_DELIVERY_RANGE_MS = 12000;
+const READY_DELIVERY_MIN_MS = 12000;
+const READY_DELIVERY_RANGE_MS = 8000;
+const DELIVERY_BACKSTOP_MS = 34000;
 const SOCIAL_DELIVERY_DELAY_MS = 650;
 const SOCIAL_INBOX_POLL_MS = 1500;
 const PLAYER_PROFILE_KEY = `${SAVE_KEY}-player-id`;
+const PLAYER_CODE_KEY = `${SAVE_KEY}-farm-code`;
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+const GUIDE_KEYS = ["connect", "watchAd", "fundRisk", "fundFromSac", "waitPotato", "pass", "moveSac", "sponsorBreak", "equipment"];
+const FARM_CODE_ALPHABET = "23456789ABCDEFGHJKLMNPQRSTUVWXYZ";
 const PIGEON_FLAP_FRAMES = [
   "pigeon-potato-flap-frame-1.png",
   "pigeon-potato-flap-frame-2.png",
@@ -125,6 +130,33 @@ function getOrCreatePlayerId() {
   if (existing) return existing;
   const created = makeLocalId();
   localStorage.setItem(PLAYER_PROFILE_KEY, created);
+  return created;
+}
+
+function makeFarmCode() {
+  let code = "";
+  const bytes = new Uint8Array(6);
+  if (typeof crypto !== "undefined" && crypto.getRandomValues) {
+    crypto.getRandomValues(bytes);
+  } else {
+    for (let i = 0; i < bytes.length; i += 1) bytes[i] = Math.floor(Math.random() * 256);
+  }
+  for (let i = 0; i < bytes.length; i += 1) {
+    code += FARM_CODE_ALPHABET[bytes[i] % FARM_CODE_ALPHABET.length];
+  }
+  return code;
+}
+
+function cleanFarmCode(value) {
+  return String(value || "").toUpperCase().replace(/[^A-Z0-9]/g, "").slice(0, 12);
+}
+
+function getOrCreateFarmCode() {
+  if (typeof localStorage === "undefined") return makeFarmCode();
+  const existing = cleanFarmCode(localStorage.getItem(PLAYER_CODE_KEY));
+  if (existing.length >= 4) return existing;
+  const created = makeFarmCode();
+  localStorage.setItem(PLAYER_CODE_KEY, created);
   return created;
 }
 
@@ -155,6 +187,9 @@ function secretSocialCopy(invite) {
   if (!invite) return "";
   const from = invite.from || "A friend";
   if (invite.kind === "normal") return `${from} tossed you a Hot Potato.`;
+  if (invite.kind === "pigeon") return `A Pigeon Potato from ${from} is circling with a hidden note.`;
+  if (invite.kind === "golden") return `A Golden Potato from ${from} is headed your way.`;
+  if (invite.kind === "tainted") return `A suspicious Tater from ${from} is headed your way.`;
   return "A mystery Hot Potato is headed your way.";
 }
 
@@ -169,10 +204,17 @@ function socialLandingCopy(social) {
 
 function socialQueueToast(social, game) {
   if (social?.kind === "normal") return `${social.from || "A friend"} passed you a Hot Potato.`;
-  if (game.risk <= 0) return "Friend potato waiting. Add SPUD to the Spud Pile.";
-  if (game.potato) return "Friend potato queued after this potato.";
-  if (deliveryProtectionActive(game)) return "Friend potato waits until sleep/snooze ends.";
-  return "Friend potato is next.";
+  const label = social?.kind === "pigeon"
+    ? "Pigeon Potato"
+    : social?.kind === "golden"
+      ? "Golden Potato"
+      : social?.kind === "tainted"
+        ? "Tainted Tater"
+        : "Friend potato";
+  if (game.risk <= 0) return `${label} waiting. Add SPUD to the Spud Pile.`;
+  if (game.potato) return `${label} queued after this potato.`;
+  if (deliveryProtectionActive(game)) return `${label} waits until sleep/snooze ends.`;
+  return `${label} is next.`;
 }
 
 function adFileAtIndex(index, excluded = []) {
@@ -338,6 +380,11 @@ const socialPotatoes = {
   }
 };
 
+function pickIncomingSocialPotato(potatoes = []) {
+  const valid = potatoes.filter((item) => item?.id && socialPotatoes[item.kind]);
+  return valid.find((item) => item.kind !== "normal") || valid[0] || null;
+}
+
 function socialSpendable(game) {
   return (Number(game.sac) || 0) + (Number(game.risk) || 0);
 }
@@ -351,6 +398,76 @@ function spendSocialCost(game, cost) {
     risk: Number((game.risk - fromRisk).toFixed(1)),
     spudSunk: Number(((game.spudSunk || 0) + fromSac + fromRisk).toFixed(1))
   };
+}
+
+function gameStateForBackend(game) {
+  return {
+    tipsEnabled: !!game.tipsEnabled,
+    tots: Number(game.tots) || 0,
+    risk: Number(game.risk) || 0,
+    sac: Number(game.sac) || 0,
+    ads: Number(game.ads) || 0,
+    creatorAdRevenue: Number(game.creatorAdRevenue) || 0,
+    passiveAdSeconds: Number(game.passiveAdSeconds) || 0,
+    passiveAdImpressions: Number(game.passiveAdImpressions) || 0,
+    sponsorSlot: Number(game.sponsorSlot) || 0,
+    sponsorBreaks: Number(game.sponsorBreaks) || 0,
+    spudCreated: Number(game.spudCreated) || 0,
+    spudSunk: Number(game.spudSunk) || 0,
+    socialXp: Number(game.socialXp) || 0,
+    claimedGoals: Array.isArray(game.claimedGoals) ? game.claimedGoals.slice(0, 32) : [],
+    socialSends: { ...initialGame.socialSends, ...(game.socialSends || {}) },
+    sleepEnabled: !!game.sleepEnabled,
+    sleepStart: Number(game.sleepStart) || initialGame.sleepStart,
+    sleepEnd: Number(game.sleepEnd) || initialGame.sleepEnd,
+    passes: Number(game.passes) || 0,
+    won: Number(game.won) || 0,
+    bestWin: Number(game.bestWin) || 0,
+    burned: Number(game.burned) || 0,
+    explosions: Number(game.explosions) || 0,
+    streak: Number(game.streak) || 0,
+    bestStreak: Number(game.bestStreak) || 0,
+    babyHandsRounds: Number(game.babyHandsRounds) || 0,
+    pendingPower: game.pendingPower || "",
+    pendingPowerStreak: Number(game.pendingPowerStreak) || 0,
+    nextPotatoIndex: Number(game.nextPotatoIndex) || 0,
+    nextAdIndex: Number(game.nextAdIndex) || 0,
+    target: Number(game.target) || 0,
+    seenGuides: { ...(game.seenGuides || {}) },
+    unlocked: { ...initialGame.unlocked, ...(game.unlocked || {}) },
+    equipment: { ...emptyEquipment(), ...(game.equipment || {}) },
+    log: Array.isArray(game.log) ? game.log.slice(0, 12) : []
+  };
+}
+
+function gameFromBackendProfile(player, farmCode) {
+  const saved = player?.gameState && typeof player.gameState === "object" ? player.gameState : {};
+  const restored = {
+    ...initialGame,
+    ...saved,
+    onboarded: true,
+    connected: true,
+    playerId: coercePlayerId(player?.id) || getOrCreatePlayerId(),
+    playerHandle: player?.handle || "",
+    profileCode: cleanFarmCode(farmCode),
+    playerName: cleanUsername(player?.username || saved.playerName || "").trim(),
+    avatar: Number(player?.avatarId ?? player?.avatar_id ?? saved.avatar ?? 0) || 0,
+    wallet: player?.wallet || "0xSPUD...DEMO",
+    holding: false,
+    potato: null,
+    pendingSocialPotato: null,
+    sponsorBreak: null,
+    nextAt: 0,
+    seenGuides: { ...(saved.seenGuides || {}) },
+    socialSends: { ...initialGame.socialSends, ...(saved.socialSends || {}) },
+    equipment: { ...emptyEquipment(), ...(saved.equipment || {}) },
+    unlocked: { ...initialGame.unlocked, ...(saved.unlocked || {}) }
+  };
+  return unlockForProgress(restored);
+}
+
+function allGuideStepsSeen() {
+  return Object.fromEntries(GUIDE_KEYS.map((key) => [key, true]));
 }
 
 function socialPotatoLink(kind, fromName, target, message = "") {
@@ -404,10 +521,24 @@ async function upsertBackendPlayer(game) {
       id: playerId,
       username: cleanUsername(game.playerName).trim(),
       avatarId: game.avatar || 0,
-      wallet: game.wallet || ""
+      wallet: game.wallet || "",
+      recoveryCode: cleanFarmCode(game.profileCode),
+      gameState: gameStateForBackend(game)
     })
   });
   return parseBackendResponse(response, "Player backend is not available.");
+}
+
+async function loginBackendPlayer(username, recoveryCode) {
+  const response = await fetch("/.netlify/functions/players-login", {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({
+      username: cleanUsername(username).trim(),
+      recoveryCode: cleanFarmCode(recoveryCode)
+    })
+  });
+  return parseBackendResponse(response, "Could not restore that player.");
 }
 
 async function listBackendPlayers(currentPlayerId) {
@@ -557,12 +688,14 @@ function goalRewardCopy(goal) {
 function loadGame() {
   try {
     const raw = localStorage.getItem(SAVE_KEY);
-    if (!raw) return { ...initialGame, playerId: getOrCreatePlayerId() };
+    if (!raw) return { ...initialGame, playerId: getOrCreatePlayerId(), profileCode: getOrCreateFarmCode() };
     const loaded = JSON.parse(raw);
     return {
       ...initialGame,
       ...loaded,
       playerId: coercePlayerId(loaded.playerId) || getOrCreatePlayerId(),
+      profileCode: cleanFarmCode(loaded.profileCode) || getOrCreateFarmCode(),
+      tipsEnabled: loaded.tipsEnabled ?? !!loaded.onboarded,
       holding: false,
       potato: null,
       sponsorBreak: null,
@@ -572,7 +705,7 @@ function loadGame() {
       unlocked: { ...initialGame.unlocked, ...(loaded.unlocked || {}) }
     };
   } catch {
-    return { ...initialGame, playerId: getOrCreatePlayerId() };
+    return { ...initialGame, playerId: getOrCreatePlayerId(), profileCode: getOrCreateFarmCode() };
   }
 }
 
@@ -601,7 +734,7 @@ function unlockForProgress(game) {
 
 function guideFor(game) {
   const seen = game.seenGuides || {};
-  if (!game.onboarded) return null;
+  if (!game.onboarded || !game.tipsEnabled) return null;
   if (!game.connected && !seen.connect) return ["connect", "Step 1 of 7", "Connect your demo wallet", "Start with 0 Tots and 0 SPUD. Connect first."];
   if (game.risk <= 0 && game.sac > 0 && !seen.fundFromSac) return ["fundFromSac", "Step 2 of 7", "Use your Spud Sac", "Move some safe SPUD back into the Spud Pile to play."];
   if (game.risk <= 0 && game.tots < SPUD.riskFundTots && !seen.watchAd) return ["watchAd", "Step 2 of 7", "Earn Tots first", "Watch one ad to get pass fuel. Tots are not crypto."];
@@ -720,13 +853,11 @@ export default function App() {
   const [toast, setToast] = useState("");
   const [fxQueue, setFxQueue] = useState([]);
   const [activeFx, setActiveFx] = useState(null);
-  const [boom, setBoom] = useState(null);
   const [babyCry, setBabyCry] = useState(0);
   const [walletBurning, setWalletBurning] = useState(false);
   const [walletPulsing, setWalletPulsing] = useState(false);
   const [flightFx, setFlightFx] = useState(null);
   const [spudTransferFx, setSpudTransferFx] = useState(null);
-  const [spudWinFx, setSpudWinFx] = useState(null);
   const [badAdFiles, setBadAdFiles] = useState([]);
   const [gearOpen, setGearOpen] = useState(false);
   const [mobileSheet, setMobileSheet] = useState(null);
@@ -758,6 +889,8 @@ export default function App() {
   const overdriveBoost = overdriveBoostPercent(game);
   const currentRewardedAdFile = adFileAtIndex(game.nextAdIndex, badAdFiles);
   const showSoundCheck = soundCheckEnabled();
+  const attentionBusy = !!activeFx || fxQueue.length > 0;
+  const backendSaveKey = JSON.stringify(gameStateForBackend(game));
 
   useEffect(() => {
     localStorage.setItem(SAVE_KEY, JSON.stringify(game));
@@ -781,26 +914,20 @@ export default function App() {
 
   useEffect(() => {
     if (!game.connected) return undefined;
-    let cancelled = false;
-    (async () => {
-      try {
-        const result = await upsertBackendPlayer(game);
-        const handle = result?.player?.handle || "";
-        if (!cancelled && handle) {
-          setGame((old) => (old.playerHandle === handle ? old : { ...old, playerHandle: handle }));
-        }
-        if (!cancelled) refreshPlayerDirectory(false);
-      } catch (error) {
-        if (!cancelled) {
+    const timer = setTimeout(() => {
+      upsertBackendPlayer(game)
+        .then((result) => {
+          const handle = result?.player?.handle || "";
+          if (handle) setGame((old) => (old.playerHandle === handle ? old : { ...old, playerHandle: handle }));
+          refreshPlayerDirectory(false);
+        })
+        .catch((error) => {
           setPlayersStatus("offline");
           showToast(error.message || "Player backend is not available.");
-        }
-      }
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, [game.connected, game.playerId, game.playerName, game.avatar, game.wallet]);
+        });
+    }, 900);
+    return () => clearTimeout(timer);
+  }, [game.connected, game.playerId, game.playerName, game.avatar, game.wallet, game.profileCode, backendSaveKey]);
 
   useEffect(() => {
     if (!game.connected) {
@@ -843,7 +970,7 @@ export default function App() {
       }, secretSocialCopy(socialInvite), "info");
     });
     showToast(socialQueueToast(socialInvite, game));
-    notifyPlayer("Hot Potato incoming", socialInvite.kind === "pigeon" ? `${socialInvite.from} sent a message potato.` : "A social potato is waiting.");
+    notifyPlayer(socialInvite.kind === "pigeon" ? "Pigeon Potato incoming" : "Hot Potato incoming", socialInvite.kind === "pigeon" ? `${socialInvite.from} sent a hidden note.` : "A social potato is waiting.");
     clearSocialInviteUrl();
     setSocialInvite(null);
   }, [socialInvite]);
@@ -977,21 +1104,6 @@ export default function App() {
   }, [activeFx?.id]);
 
   useEffect(() => {
-    if (!boom) return undefined;
-    const timer = setTimeout(() => setBoom(null), 2400);
-    return () => clearTimeout(timer);
-  }, [boom]);
-
-  useEffect(() => {
-    if (!boom?.potatoId) return;
-    setGame((old) => (
-      old.potato?.id === boom.potatoId
-        ? { ...old, potato: null, holding: false, sponsorBreak: null }
-        : old
-    ));
-  }, [boom?.id, boom?.potatoId]);
-
-  useEffect(() => {
     if (!walletBurning) return undefined;
     const timer = setTimeout(() => setWalletBurning(false), 2200);
     return () => clearTimeout(timer);
@@ -1014,12 +1126,6 @@ export default function App() {
     const timer = setTimeout(() => setSpudTransferFx(null), 1100);
     return () => clearTimeout(timer);
   }, [spudTransferFx]);
-
-  useEffect(() => {
-    if (!spudWinFx) return undefined;
-    const timer = setTimeout(() => setSpudWinFx(null), 1900);
-    return () => clearTimeout(timer);
-  }, [spudWinFx]);
 
   useEffect(() => {
     const timer = setInterval(() => {
@@ -1052,12 +1158,12 @@ export default function App() {
             stopHoldDrone();
             const boomRect = document.querySelector(".potato-wrap")?.getBoundingClientRect();
             playExplosionSound();
-            setBoom({
-              id: Date.now(),
-              potatoId: updated.id,
+            enqueueFx({
+              type: "boom",
               burned,
               x: boomRect ? boomRect.left + boomRect.width / 2 : window.innerWidth / 2,
-              y: boomRect ? boomRect.top + boomRect.height / 2 : window.innerHeight * 0.45
+              y: boomRect ? boomRect.top + boomRect.height / 2 : window.innerHeight * 0.45,
+              duration: 2650
             });
             setWalletBurning(true);
             setFlightFx(null);
@@ -1132,14 +1238,18 @@ export default function App() {
     if (!game.connected || game.risk <= 0 || game.potato || deliveryProtectionActive(game)) return undefined;
     const now = Date.now();
     const hasSocial = !!game.pendingSocialPotato;
-    const targetAt = hasSocial
-      ? socialDeliveryAt(game, now)
-      : game.nextAt || now + READY_DELIVERY_MIN_MS + Math.random() * READY_DELIVERY_RANGE_MS;
+    const tutorialPaused = autoDeliveryPaused(game) && !game.potato;
+    if (tutorialPaused && !hasSocial) return undefined;
+    const targetAt = hasSocial ? socialDeliveryAt(game, now) : game.nextAt;
+    if (!targetAt) return undefined;
     const delay = clamp(targetAt - now, hasSocial ? 250 : 700, hasSocial ? 1600 : DELIVERY_BACKSTOP_MS);
     const timer = setTimeout(() => {
       setGame((old) => {
         if (!old.connected || old.risk <= 0 || old.potato || deliveryProtectionActive(old)) return old;
+        const oldTutorialPaused = autoDeliveryPaused(old) && !old.potato;
+        if (oldTutorialPaused && !old.pendingSocialPotato) return old;
         if (old.pendingSocialPotato) return deliverPotato({ ...old, nextAt: 0 });
+        if (!old.nextAt || Date.now() < old.nextAt) return old;
         return deliverPotato({ ...old, nextAt: 0 });
       });
     }, delay);
@@ -1283,7 +1393,7 @@ export default function App() {
     if (!game.connected || !game.playerHandle || game.potato || game.pendingSocialPotato) return;
     try {
       const result = await listBackendSocialInbox(game.playerHandle);
-      const incoming = (result.potatoes || []).find((item) => item.id && socialPotatoes[item.kind]);
+      const incoming = pickIncomingSocialPotato(result.potatoes || []);
       if (!incoming) return;
       const claimed = await claimBackendSocialPotato(incoming.id, game.playerName);
       if (!claimed?.kind || !socialPotatoes[claimed.kind]) return;
@@ -1307,7 +1417,7 @@ export default function App() {
         }, secretSocialCopy(invite), "info");
       });
       showToast(socialQueueToast(invite, game));
-      notifyPlayer("Hot Potato incoming", invite.kind === "pigeon" ? `${invite.from} sent a message potato.` : "A social potato is waiting.");
+      notifyPlayer(invite.kind === "pigeon" ? "Pigeon Potato incoming" : "Hot Potato incoming", invite.kind === "pigeon" ? `${invite.from} sent a hidden note.` : "A social potato is waiting.");
     } catch {
       // Keep social play non-blocking if the backend is temporarily unavailable.
     }
@@ -1522,6 +1632,7 @@ export default function App() {
   }
 
   function enqueueFx(fx) {
+    // Keep every big readable screen animation in one lane so wins, unlocks, pranks, and BOOMs never stack.
     setFxQueue((old) => [
       ...old,
       {
@@ -1530,6 +1641,15 @@ export default function App() {
         ...fx
       }
     ]);
+  }
+
+  function enqueueSpudWin(amount, note) {
+    enqueueFx({
+      type: "spud-win",
+      amount,
+      note,
+      duration: 1900
+    });
   }
 
   function pickSound(group) {
@@ -1770,7 +1890,7 @@ export default function App() {
     };
   }
 
-  function completeOnboarding() {
+  async function completeOnboarding(takeTour = true) {
     clearFx();
     playSfx("tap");
     const playerName = cleanUsername(game.playerName).trim();
@@ -1779,9 +1899,60 @@ export default function App() {
       showToast("Pick a unique username first.");
       return;
     }
-    setGame((old) => ({ ...old, playerName, onboarded: true }));
+    const profileCode = cleanFarmCode(game.profileCode) || getOrCreateFarmCode();
+    if (typeof localStorage !== "undefined") localStorage.setItem(PLAYER_CODE_KEY, profileCode);
+    const nextGame = {
+      ...game,
+      playerName,
+      profileCode,
+      onboarded: true,
+      tipsEnabled: !!takeTour,
+      seenGuides: takeTour ? { ...(game.seenGuides || {}) } : allGuideStepsSeen()
+    };
+    try {
+      const result = await upsertBackendPlayer(nextGame);
+      const handle = result?.player?.handle || "";
+      if (handle) nextGame.playerHandle = handle;
+    } catch (error) {
+      if (/taken/i.test(error.message || "")) {
+        playSfx("error");
+        showToast(error.message);
+        return;
+      }
+      showToast("Profile is local for now. It will save when the backend is available.");
+    }
+    setGame(nextGame);
     requestNotifications();
-    showToast(`Welcome, ${playerName}.`);
+    showToast(takeTour ? `Welcome, ${playerName}. The farm tour is on.` : `Welcome, ${playerName}. Tour skipped.`);
+  }
+
+  async function restoreProfile(username, farmCode) {
+    clearFx();
+    playSfx("tap");
+    const cleanName = cleanUsername(username).trim();
+    const cleanCode = cleanFarmCode(farmCode);
+    if (!validUsername(cleanName) || cleanCode.length < 4) {
+      playSfx("error");
+      showToast("Enter your username and Farm Code.");
+      return false;
+    }
+    try {
+      const result = await loginBackendPlayer(cleanName, cleanCode);
+      const player = result.player || {};
+      const restored = gameFromBackendProfile(player, cleanCode);
+      if (typeof localStorage !== "undefined") {
+        localStorage.setItem(PLAYER_PROFILE_KEY, restored.playerId);
+        localStorage.setItem(PLAYER_CODE_KEY, cleanCode);
+      }
+      setGame(restored);
+      requestNotifications();
+      showToast(`Welcome back, ${restored.playerName}.`);
+      return true;
+    } catch (error) {
+      playSfx("error");
+      showToast(error.message || "Could not restore that player.");
+      return false;
+    }
   }
 
   function connect() {
@@ -1798,6 +1969,8 @@ export default function App() {
         ...initialGame,
         onboarded: old.onboarded,
         playerId: coercePlayerId(old.playerId) || getOrCreatePlayerId(),
+        profileCode: cleanFarmCode(old.profileCode) || getOrCreateFarmCode(),
+        tipsEnabled: !!old.tipsEnabled,
         playerName: cleanUsername(old.playerName).trim(),
         avatar: old.avatar,
         seenGuides: { ...(old.seenGuides || {}) },
@@ -1820,8 +1993,9 @@ export default function App() {
     stopHoldDrone();
     playSfx("tap");
     localStorage.removeItem(SAVE_KEY);
+    localStorage.removeItem(PLAYER_CODE_KEY);
     clearSocialInviteUrl();
-    setGame({ ...initialGame, playerId: getOrCreatePlayerId() });
+    setGame({ ...initialGame, playerId: getOrCreatePlayerId(), profileCode: getOrCreateFarmCode() });
     setMobileSheet(null);
     setGearOpen(false);
     setAdModal(null);
@@ -1837,6 +2011,8 @@ export default function App() {
       ...initialGame,
       onboarded: old.onboarded,
       playerId: coercePlayerId(old.playerId) || getOrCreatePlayerId(),
+      profileCode: cleanFarmCode(old.profileCode) || getOrCreateFarmCode(),
+      tipsEnabled: true,
       playerName: cleanUsername(old.playerName).trim(),
       avatar: old.avatar,
       seenGuides: {}
@@ -1899,13 +2075,43 @@ export default function App() {
     showToast("Skipped an ad that did not render.");
   }
 
-  function fundRisk() {
+  function moveToPile() {
     clearFx();
-    if (game.tots >= SPUD.riskFundTots && !game.potato) animateSpudToPile("fundRisk");
+    if (!game.potato && (game.sac > 0 || game.tots >= SPUD.riskFundTots)) {
+      animateSpudToPile(game.sac > 0 ? "spudSac" : "fundRisk");
+    }
     setGame((old) => {
-      if (old.tots < SPUD.riskFundTots || old.potato) {
+      if (old.potato) {
         playSfx("error");
-        showToast(old.potato ? "Wait until your hands are empty." : `Need ${SPUD.riskFundTots} Tots.`);
+        showToast("Wait until your hands are empty.");
+        return old;
+      }
+      const chunk = SPUD.moveChunkSpud || SPUD.riskFundSpud;
+      if (old.sac > 0) {
+        playSfx("fund");
+        const moved = Math.min(chunk, old.sac);
+        const sacToPileClicks = (old.sacToPileClicks || 0) + 1;
+        if (sacToPileClicks > 0 && sacToPileClicks % 10 === 0) {
+          playSoundFile(soundFiles.aLotOfSpud, 0.96);
+          enqueueFx({
+            type: "spud",
+            title: "A LOT OF SPUD",
+            subtitle: "That Spud Pile is getting serious.",
+            duration: 2400
+          });
+        }
+        return addLog({
+          ...markGuidesSeen(old, "fundFromSac"),
+          sacToPileClicks,
+          sac: Number((old.sac - moved).toFixed(1)),
+          risk: Number((old.risk + moved).toFixed(1)),
+          nextAt: old.nextAt || Date.now() + READY_DELIVERY_MIN_MS + Math.random() * READY_DELIVERY_RANGE_MS,
+          unlocked: { ...old.unlocked, sac: true }
+        }, `${fmt(moved)} SPUD moved from the Spud Sac into the Spud Pile.`, "info");
+      }
+      if (old.tots < SPUD.riskFundTots) {
+        playSfx("error");
+        showToast(`Need ${SPUD.riskFundTots} Tots or SPUD in the Spud Sac.`);
         return old;
       }
       playSfx("fund");
@@ -1919,38 +2125,6 @@ export default function App() {
         spudCreated: old.spudCreated + SPUD.riskFundSpud,
         nextAt: old.nextAt || Date.now() + READY_DELIVERY_MIN_MS + Math.random() * READY_DELIVERY_RANGE_MS
       }, `${SPUD.riskFundTots} Tots converted into ${SPUD.riskFundSpud} SPUD in the Spud Pile.`, "good");
-    });
-  }
-
-  function fundRiskFromSac() {
-    clearFx();
-    if (game.sac > 0 && !game.potato) animateSpudToPile("spudSac");
-    setGame((old) => {
-      if (old.potato || old.sac <= 0) {
-        playSfx("error");
-        showToast(old.potato ? "Wait until your hands are empty." : "No SPUD in the Spud Sac.");
-        return old;
-      }
-      playSfx("fund");
-      const moved = Math.min(SPUD.riskFundSpud, old.sac);
-      const sacToPileClicks = (old.sacToPileClicks || 0) + 1;
-      if (sacToPileClicks > 0 && sacToPileClicks % 10 === 0) {
-        playSoundFile(soundFiles.aLotOfSpud, 0.96);
-        enqueueFx({
-          type: "spud",
-          title: "A LOT OF SPUD",
-          subtitle: "That Spud Pile is getting serious.",
-          duration: 2400
-        });
-      }
-      return addLog({
-        ...markGuidesSeen(old, "fundFromSac"),
-        sacToPileClicks,
-        sac: old.sac - moved,
-        risk: old.risk + moved,
-        nextAt: old.nextAt || Date.now() + READY_DELIVERY_MIN_MS + Math.random() * READY_DELIVERY_RANGE_MS,
-        unlocked: { ...old.unlocked, sac: true }
-      }, `${fmt(moved)} SPUD moved from the Spud Sac into the Spud Pile.`, "info");
     });
   }
 
@@ -2119,11 +2293,7 @@ export default function App() {
       stopHoldDrone();
       playSfx("pass");
       playSfx("win", Math.max(0.5, reward / 24));
-      setSpudWinFx({
-        id: Date.now(),
-        amount: reward,
-        note: golden ? "Golden Window bonus" : overdriveBonus ? "Overdrive boosted the pile" : "landed in the Spud Pile"
-      });
+      enqueueSpudWin(reward, golden ? "Golden Window bonus" : overdriveBonus ? "Overdrive boosted the pile" : "landed in the Spud Pile");
       if (triggeredBabyHands) announceBabyHands();
       if (pendingPower && streak % 5 === 0) announceHotStreak(streak, pendingPower);
       if (golden) {
@@ -2205,10 +2375,11 @@ export default function App() {
         return old;
       }
       playSfx("chest");
+      const moved = Math.min(SPUD.moveChunkSpud || SPUD.riskFundSpud, old.risk);
       return addLog({
         ...markGuidesSeen(old, "moveSac"),
-        sac: old.sac + old.risk,
-        risk: 0,
+        sac: Number((old.sac + moved).toFixed(1)),
+        risk: Number((old.risk - moved).toFixed(1)),
         streak: 0,
         sacToPileClicks: 0,
         overdriveActive: false,
@@ -2216,7 +2387,7 @@ export default function App() {
         pendingPower: "",
         pendingPowerStreak: 0,
         unlocked: { ...old.unlocked, sac: true, equipment: true }
-      }, "Moved the Spud Pile into the Spud Sac. Streak reset.", "info");
+      }, `Moved ${fmt(moved)} SPUD into the Spud Sac. Streak reset.`, "info");
     });
   }
 
@@ -2434,9 +2605,11 @@ export default function App() {
         playSfx("snooze");
       } else if (key === "ovenMitts") {
         p.equipment.ovenMitts = true;
+        p.equipment.ovenMittsFx = Date.now();
         playSfx("chest");
       } else if (key === "foilWrap") {
         p.equipment.foilWrap = true;
+        p.equipment.foilWrapFx = Date.now();
         p.fuse += 8;
         playSfx("chest");
       } else if (key === "thermometer") {
@@ -2549,8 +2722,7 @@ export default function App() {
           register={register}
           setAdModal={setAdModal}
           grantAdReward={grantAdReward}
-          fundRisk={fundRisk}
-          fundRiskFromSac={fundRiskFromSac}
+          moveToPile={moveToPile}
           moveToSac={moveToSac}
           claimGoal={claimGoal}
           toggleSleepOpen={toggleSleepOpen}
@@ -2648,6 +2820,7 @@ export default function App() {
           game={game}
           setGame={setGame}
           completeOnboarding={completeOnboarding}
+          restoreProfile={restoreProfile}
         />
       )}
 
@@ -2670,11 +2843,9 @@ export default function App() {
         />
       )}
 
-      {activeFx && <FullscreenFx fx={activeFx} />}
+      {activeFx && <AttentionFx fx={activeFx} />}
       {flightFx && <PotatoFlightFx fx={flightFx} />}
-      {boom && <BoomOverlay boom={boom} />}
       {spudTransferFx && <SpudTransferFx fx={spudTransferFx} />}
-      {spudWinFx && <SpudWinPop fx={spudWinFx} />}
       {messageReveal && (
         <MessagePotatoModal
           message={messageReveal}
@@ -2729,8 +2900,7 @@ function WalletPanel({
   register,
   setAdModal,
   grantAdReward,
-  fundRisk,
-  fundRiskFromSac,
+  moveToPile,
   moveToSac,
   claimGoal,
   toggleSleepOpen,
@@ -2740,13 +2910,26 @@ function WalletPanel({
 }) {
   const payout = rewardedAdPayout(game.ads);
   const handsEmpty = !game.potato;
-  const canFundRisk = handsEmpty && game.tots >= SPUD.riskFundTots;
-  const canFundFromSac = handsEmpty && game.sac > 0;
+  const moveChunk = SPUD.moveChunkSpud || SPUD.riskFundSpud;
+  const canMoveToPile = handsEmpty && (game.sac > 0 || game.tots >= SPUD.riskFundTots);
   const canMoveToSac = handsEmpty && game.risk > 0;
+  const moveToPileAmount = game.sac > 0 ? Math.min(moveChunk, game.sac) : SPUD.riskFundSpud;
+  const moveToSacAmount = game.risk > 0 ? Math.min(moveChunk, game.risk) : moveChunk;
+  const registerMoveToPile = (node) => {
+    register("fundRisk")(node);
+    register("fundFromSac")(node);
+  };
   return (
     <aside className="panel wallet-panel">
       <h2>Wallet</h2>
       <div className="tiny">{game.wallet || "Not connected"}</div>
+      {game.onboarded && (
+        <details className="farm-code-pocket">
+          <summary>Farm Code</summary>
+          <strong>{cleanFarmCode(game.profileCode) || "Not set"}</strong>
+          <span>Use this with your username to restore this test player.</span>
+        </details>
+      )}
 
       {game.connected && (
         <div className="wallet-grid">
@@ -2773,11 +2956,6 @@ function WalletPanel({
             <strong>{fmt(game.tots, game.tots % 1 ? 1 : 0)}</strong>
             <span>Pass fuel</span>
           </div>
-          <div className="stat wide">
-            <small>Play Requirement</small>
-            <strong>{game.risk > 0 ? "Ready" : "Build Spud Pile"}</strong>
-            <span>{game.risk > 0 ? "Hot Potatoes can arrive." : game.sac > 0 ? "Move SPUD from the Spud Sac." : "Convert Tots before playing."}</span>
-          </div>
         </div>
       )}
 
@@ -2791,26 +2969,24 @@ function WalletPanel({
           <button className="ghost debug-ad-override" onClick={() => grantAdReward("Demo ad override")}>
             Test +{payout.tots} Tots
           </button>
-          {handsEmpty && (
-            <button ref={register("fundRisk")} className={`danger ${canFundRisk ? "" : "visually-disabled"}`} onClick={fundRisk} aria-disabled={!canFundRisk}>
-              Add to Spud Pile - {SPUD.riskFundTots} Tots
-            </button>
-          )}
-          {handsEmpty && (
-            <button ref={register("fundFromSac")} className={`green ${canFundFromSac ? "" : "visually-disabled"}`} onClick={fundRiskFromSac} aria-disabled={!canFundFromSac}>
-              Move SPUD to Spud Pile
-            </button>
-          )}
-          {handsEmpty && (
-            <button ref={register("moveSac")} className={`green ${canMoveToSac ? "" : "visually-disabled"}`} onClick={moveToSac} aria-disabled={!canMoveToSac}>
-              Move to Spud Sac
-            </button>
-          )}
+          <button
+            ref={registerMoveToPile}
+            className={`danger ${canMoveToPile ? "" : "visually-disabled"}`}
+            onClick={moveToPile}
+            disabled={!canMoveToPile}
+            aria-disabled={!canMoveToPile}
+            title={game.sac > 0 ? "Moves SPUD from the Spud Sac." : `Converts ${SPUD.riskFundTots} Tots into SPUD first.`}
+          >
+            Move {fmt(moveToPileAmount)} SPUD to Pile
+          </button>
+          <button ref={register("moveSac")} className={`green ${canMoveToSac ? "" : "visually-disabled"}`} onClick={moveToSac} disabled={!canMoveToSac} aria-disabled={!canMoveToSac}>
+            Move {fmt(moveToSacAmount)} SPUD to Sac
+          </button>
         </div>
       )}
       {game.connected && (
         <p className="wallet-hint">
-          The Spud Pile is exposed SPUD, not a payout multiplier. Move SPUD to the Spud Sac when you want safety; doing that resets the streak.
+          The Spud Pile is exposed SPUD, not a payout multiplier. Move SPUD in 6-SPUD chunks; moving to the Spud Sac resets the streak.
         </p>
       )}
 
@@ -2940,6 +3116,18 @@ function ProtectionPanel({ game, register, toggleSleepOpen, setSleepHour, snooze
   );
 }
 
+function ScoreSpudPile({ amount }) {
+  return (
+    <div className={`score-pile-chip ${amount > 0 ? "" : "empty"}`} aria-label={`Spud Pile ${fmt(amount)}`}>
+      <div className="score-pile-copy">
+        <small>Spud Pile</small>
+        <strong>{fmt(amount)}</strong>
+      </div>
+      <SpudMiniPile amount={amount} compact className="score-pile-stack" />
+    </div>
+  );
+}
+
 function ScoreBar({ game, avatar }) {
   return (
     <div className="scorebar">
@@ -2949,7 +3137,7 @@ function ScoreBar({ game, avatar }) {
         </div>
       <div><strong>{game.playerName}</strong><span>player</span></div>
       </div>
-      <span className="chip spud">Spud Pile {fmt(game.risk)}</span>
+      <ScoreSpudPile amount={game.risk} />
       <span className="chip tots">Tots {fmt(game.tots, game.tots % 1 ? 1 : 0)}</span>
     </div>
   );
@@ -3115,13 +3303,14 @@ function EquipmentStatus({ gear }) {
 function EquipmentFx({ gear = {} }) {
   return (
     <>
-      <div className="equipment-fx mitts-fx" aria-hidden="true">
+      <div key={`mitts-${gear.ovenMittsFx || Number(!!gear.ovenMitts)}`} className="equipment-fx mitts-fx" aria-hidden="true">
         <span className="oven-mitt left"><i /><b /></span>
         <span className="oven-mitt right"><i /><b /></span>
       </div>
       <div key={`sauce-${gear.hotSauceFx || gear.hotSauceSquirts || 0}`} className="equipment-tool-fx hot-sauce-tool-fx" aria-hidden="true">
         <img src={assetUrl("Equipment", "hot-sauce-bottle.svg")} alt="" />
-        <span />
+        <span className="sauce-stream" />
+        <span className="sauce-burst" />
       </div>
       <div key={`cream-${gear.sourCreamFx || gear.sourCreamTicks || 0}`} className="equipment-tool-fx sour-cream-tool-fx" aria-hidden="true">
         <img src={assetUrl("Equipment", "sour-cream-tub.svg")} alt="" />
@@ -3129,6 +3318,13 @@ function EquipmentFx({ gear = {} }) {
       </div>
       <div key={`thermo-${gear.thermometerFx || Number(!!gear.thermometer)}`} className="equipment-tool-fx thermometer-tool-fx" aria-hidden="true">
         <img src={assetUrl("Equipment", "thermometer.svg")} alt="" />
+      </div>
+      <div key={`foil-${gear.foilWrapFx || Number(!!gear.foilWrap)}`} className="equipment-tool-fx foil-tool-fx" aria-hidden="true">
+        <span className="foil-sheet sheet-one" />
+        <span className="foil-sheet sheet-two" />
+        <span className="foil-spark spark-one" />
+        <span className="foil-spark spark-two" />
+        <span className="foil-spark spark-three" />
       </div>
       <div className="equipment-fx sour-cream-fx" aria-hidden="true" />
       <div className="equipment-fx hot-sauce-fx" aria-hidden="true" />
@@ -3165,41 +3361,64 @@ function HeatWisps() {
 
 function PlayableAdVideo({ file, soundOn, loop = false, onBadVideo }) {
   const videoRef = useRef(null);
+  const [loadState, setLoadState] = useState("loading");
 
   useEffect(() => {
     const video = videoRef.current;
     if (!video || !file) return undefined;
+    setLoadState("loading");
     video.muted = !soundOn;
     video.volume = soundOn ? 0.76 : 0;
+    video.load();
     const attempt = video.play();
     if (attempt?.catch) attempt.catch(() => {});
-    return undefined;
+
+    const timer = window.setTimeout(() => {
+      if (!videoRef.current || videoRef.current !== video) return;
+      const hasVideoFrame = video.videoWidth > 0 && video.videoHeight > 0;
+      if (video.error || video.readyState === 0 || !hasVideoFrame) {
+        setLoadState("failed");
+        onBadVideo?.(file);
+      }
+    }, 1800);
+
+    return () => window.clearTimeout(timer);
   }, [file, soundOn]);
 
-  function checkLoadable() {
+  function markLoadable() {
     const video = videoRef.current;
     if (!video || !file) return;
-    window.setTimeout(() => {
-      if (!videoRef.current || videoRef.current.src !== video.src) return;
-      if (video.error || video.readyState === 0) onBadVideo?.(file);
-    }, 1600);
+    if (video.videoWidth > 0 && video.videoHeight > 0) setLoadState("playing");
+  }
+
+  function markBad() {
+    setLoadState("failed");
+    onBadVideo?.(file);
   }
 
   if (!file) return <div className="ad-placeholder">No ad videos found.</div>;
 
   return (
-    <video
-      ref={videoRef}
-      src={assetUrl("Game_Ads", file)}
-      autoPlay
-      controls
-      loop={loop}
-      playsInline
-      muted={!soundOn}
-      onLoadedData={checkLoadable}
-      onCanPlay={checkLoadable}
-      onError={() => onBadVideo?.(file)}
-    />
+    <div className={`ad-video-shell ${loadState}`}>
+      <video
+        key={file}
+        ref={videoRef}
+        src={assetUrl("Game_Ads", file)}
+        autoPlay
+        controls
+        loop={loop}
+        playsInline
+        preload="auto"
+        muted={!soundOn}
+        onLoadedMetadata={markLoadable}
+        onLoadedData={markLoadable}
+        onCanPlay={markLoadable}
+        onPlaying={markLoadable}
+        onError={markBad}
+      />
+      {loadState === "loading" && <div className="ad-video-status">Loading sponsor reel...</div>}
+      {loadState === "failed" && <div className="ad-video-status">Finding another ad...</div>}
+    </div>
   );
 }
 
@@ -3383,6 +3602,14 @@ function QuickGearBar({ game, useEquipment }) {
 }
 
 function GearIcon({ kind }) {
+  const imageByKind = {
+    sauce: "hot-sauce-bottle.svg",
+    cream: "sour-cream-tub.svg",
+    thermo: "thermometer.svg"
+  };
+  if (imageByKind[kind]) {
+    return <img className={`gear-icon gear-icon-img gear-icon-${kind}`} src={assetUrl("Equipment", imageByKind[kind])} alt="" aria-hidden="true" />;
+  }
   return <i className={`gear-icon gear-icon-${kind || "bag"}`} aria-hidden="true" />;
 }
 
@@ -3642,8 +3869,77 @@ function EconomyPulse({ game }) {
   );
 }
 
-function OnboardingModal({ game, setGame, completeOnboarding }) {
+function OnboardingModal({ game, setGame, completeOnboarding, restoreProfile }) {
+  const [mode, setMode] = useState("create");
+  const [step, setStep] = useState("profile");
+  const [loginName, setLoginName] = useState("");
+  const [loginCode, setLoginCode] = useState("");
+  const [status, setStatus] = useState("");
   const avatar = avatars[game.avatar] || avatars[0];
+  const profileCode = cleanFarmCode(game.profileCode) || getOrCreateFarmCode();
+
+  useEffect(() => {
+    if (!game.profileCode) setGame((old) => ({ ...old, profileCode }));
+  }, [game.profileCode, profileCode, setGame]);
+
+  async function submitLogin() {
+    setStatus("Looking for your potato patch...");
+    const ok = await restoreProfile(loginName, loginCode);
+    if (!ok) setStatus("That username and Farm Code did not match.");
+  }
+
+  if (mode === "login") {
+    return (
+      <div className="modal show">
+        <div className="modal-card onboarding-card login-card">
+          <h2>Find Your Player</h2>
+          <p className="onboarding-note">Use your username and Farm Code to get back your saved profile, friends, and SPUD.</p>
+          <label>
+            Username
+            <input
+              value={loginName}
+              placeholder="Your username"
+              maxLength={16}
+              onChange={(e) => setLoginName(cleanUsername(e.target.value))}
+            />
+          </label>
+          <label>
+            Farm Code
+            <input
+              value={loginCode}
+              placeholder="ABC123"
+              maxLength={12}
+              onChange={(e) => setLoginCode(cleanFarmCode(e.target.value))}
+            />
+          </label>
+          {status && <p className="login-status">{status}</p>}
+          <button className="green" onClick={submitLogin} disabled={!validUsername(loginName) || cleanFarmCode(loginCode).length < 4}>Log Back In</button>
+          <button className="ghost" onClick={() => { setMode("create"); setStatus(""); }}>Make a New Player</button>
+        </div>
+      </div>
+    );
+  }
+
+  if (step === "tour") {
+    return (
+      <div className="modal show">
+        <div className="modal-card onboarding-card tour-choice-card">
+          <h2>Tour the Potato Farm?</h2>
+          <div className="onboarding-preview">
+            <div className="avatar large"><img src={assetUrl("Avatars", avatar.file)} alt="" /></div>
+            <div><strong>{game.playerName || "Your Name"}</strong><span>Farm Code {profileCode}</span></div>
+          </div>
+          <p className="onboarding-note">The tour points at each button the first time you need it. You can replay tips later from the top bar.</p>
+          <div className="tour-actions">
+            <button className="green" onClick={() => completeOnboarding(true)}>Yes, Show Me Around</button>
+            <button className="ghost" onClick={() => completeOnboarding(false)}>No Tour, Let Me Play</button>
+          </div>
+          <button className="text-link" type="button" onClick={() => setStep("profile")}>Back to avatar</button>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="modal show">
       <div className="modal-card onboarding-card">
@@ -3666,6 +3962,18 @@ function OnboardingModal({ game, setGame, completeOnboarding }) {
             onChange={(e) => setGame((old) => ({ ...old, playerName: cleanUsername(e.target.value) }))}
           />
         </label>
+        <div className="farm-code-card">
+          <small>Your Farm Code</small>
+          <strong>{profileCode}</strong>
+          <span>No password for now. This code lets you recover this player after clearing cookies.</span>
+          <button
+            className="ghost mini-action"
+            type="button"
+            onClick={() => setGame((old) => ({ ...old, profileCode: makeFarmCode() }))}
+          >
+            New Code
+          </button>
+        </div>
         <div className="avatar-picker">
           {avatars.map((item) => (
             <button key={item.id} className={item.id === game.avatar ? "selected" : ""} onClick={() => setGame((old) => ({ ...old, avatar: item.id }))}>
@@ -3674,7 +3982,8 @@ function OnboardingModal({ game, setGame, completeOnboarding }) {
             </button>
           ))}
         </div>
-        <button className="green" onClick={completeOnboarding} disabled={!validUsername(game.playerName)}>Start Playing</button>
+        <button className="green" onClick={() => setStep("tour")} disabled={!validUsername(game.playerName)}>Save Player</button>
+        <button className="ghost" onClick={() => setMode("login")}>I Already Have a Player</button>
       </div>
     </div>
   );
@@ -3754,6 +4063,12 @@ function SoundCheckPanel({ close, playGroup, playOne }) {
       </div>
     </div>
   );
+}
+
+function AttentionFx({ fx }) {
+  if (fx.type === "spud-win") return <SpudWinPop fx={fx} />;
+  if (fx.type === "boom") return <BoomOverlay boom={fx} />;
+  return <FullscreenFx fx={fx} />;
 }
 
 function FullscreenFx({ fx }) {
@@ -3916,10 +4231,13 @@ function SpudWinPop({ fx }) {
   );
 }
 
-function SpudMiniPile({ amount }) {
-  const count = clamp(Math.floor(Math.sqrt(Math.max(0, amount)) * 4.7), 0, 190);
+function SpudMiniPile({ amount, compact = false, className = "" }) {
+  const safeAmount = Math.max(0, Number(amount) || 0);
+  const count = clamp(Math.floor(Math.sqrt(safeAmount) * (compact ? 3.25 : 4.7)), 0, compact ? 58 : 190);
   const rows = [];
-  const baseCapacity = clamp(Math.ceil(Math.sqrt(count || 1) * 2.2), 5, 22);
+  const baseCapacity = compact
+    ? clamp(Math.ceil(Math.sqrt(count || 1) * 2.1), 4, 13)
+    : clamp(Math.ceil(Math.sqrt(count || 1) * 2.2), 5, 22);
   let placed = 0;
   let row = 0;
   while (placed < count) {
@@ -3930,16 +4248,18 @@ function SpudMiniPile({ amount }) {
     row += 1;
   }
   return (
-    <div className={`spud-pile-stack ${count ? "" : "empty"}`}>
+    <div className={`spud-pile-stack ${compact ? "compact" : ""} ${className} ${count ? "" : "empty"}`}>
       {Array.from({ length: count }, (_, i) => {
         const info = rows.find((item) => i >= item.start && i < item.start + item.used) || rows[0];
         const inRow = i - info.start;
         const rowCenter = (info.used - 1) / 2;
-        const layerStagger = info.row % 2 ? 4.5 : 0;
-        const spread = clamp(13.5 - info.row * 0.7, 8, 13.5);
-        const x = (inRow - rowCenter) * spread + layerStagger + Math.sin(i * 2.1) * 1.1;
-        const y = info.row * 8.1 + Math.cos(i * 1.7) * 0.6;
-        const size = clamp(19 - info.row * 0.35 + (i % 4) * 0.8, 14, 21);
+        const layerStagger = info.row % 2 ? (compact ? 2.5 : 4.5) : 0;
+        const spread = compact ? clamp(9.4 - info.row * 0.48, 5.4, 9.4) : clamp(13.5 - info.row * 0.7, 8, 13.5);
+        const x = (inRow - rowCenter) * spread + layerStagger + Math.sin(i * 2.1) * (compact ? 0.65 : 1.1);
+        const y = info.row * (compact ? 5.25 : 8.1) + Math.cos(i * 1.7) * (compact ? 0.34 : 0.6);
+        const size = compact
+          ? clamp(12.6 - info.row * 0.24 + (i % 4) * 0.42, 8.8, 13.6)
+          : clamp(19 - info.row * 0.35 + (i % 4) * 0.8, 14, 21);
         const r = (i * 37) % 44 - 22;
         return (
           <span

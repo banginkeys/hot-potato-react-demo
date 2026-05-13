@@ -146,7 +146,23 @@ function generatedSoundFiles(pathParts, outputName) {
     mkdirSync(outDir, { recursive: true });
     files.forEach((file, index) => {
       const safeName = `${String(index + 1).padStart(2, "0")}-${safeSoundName(file)}`;
-      copyFileSync(join(assetsRoot, ...pathParts, file), join(outDir, safeName));
+      const source = join(assetsRoot, ...pathParts, file);
+      const destination = join(outDir, safeName);
+      try {
+        copyFileSync(source, destination);
+      } catch (error) {
+        if (error?.code === "EPERM") {
+          try {
+            writeFileSync(destination, readFileSync(source));
+            return;
+          } catch {
+            const sourceSize = statSync(source).size;
+            const destinationSize = existsSync(destination) ? statSync(destination).size : -1;
+            if (sourceSize === destinationSize) return;
+          }
+        }
+        throw error;
+      }
     });
   }
   return filesInDir(outDir, [".wav", ".mp3", ".ogg"]).map((safeName) => {

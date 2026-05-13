@@ -1,5 +1,6 @@
 import { json, parseJson, preflight } from "./_lib/http.js";
 import { findPlayerByUsername, upsertPlayer } from "./_lib/supabase.js";
+import { cleanGameState, hashRecoveryCode } from "./_lib/profileAuth.js";
 import { createHash } from "node:crypto";
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
@@ -60,14 +61,27 @@ export async function handler(event) {
     if (existing && existing.id !== id) {
       return json(409, { error: "That username is already taken." });
     }
-    const record = await upsertPlayer({
+    const recoveryHash = hashRecoveryCode(body.recoveryCode);
+    const nextRecord = {
       id,
       username,
       handle: makeHandle(username, id),
       avatar_id: Math.max(0, Math.min(99, Number(body.avatarId) || 0)),
       wallet: cleanText(body.wallet, 32),
+      ...(recoveryHash ? { recovery_code_hash: recoveryHash } : {}),
+      game_state: cleanGameState(body.gameState),
       last_seen_at: new Date().toISOString()
-    });
+    };
+    let record;
+    try {
+      record = await upsertPlayer(nextRecord);
+    } catch (error) {
+      if (!/recovery_code_hash|game_state|schema cache|column/i.test(error.message || "")) throw error;
+      const legacyRecord = { ...nextRecord };
+      delete legacyRecord.recovery_code_hash;
+      delete legacyRecord.game_state;
+      record = await upsertPlayer(legacyRecord);
+    }
 
     return json(200, {
       configured: !record.fallback,
@@ -77,6 +91,7 @@ export async function handler(event) {
         handle: record.handle,
         avatarId: record.avatar_id,
         wallet: record.wallet,
+        gameState: record.game_state || {},
         lastSeenAt: record.last_seen_at
       }
     });

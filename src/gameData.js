@@ -4,7 +4,8 @@ export const SAVE_KEY = "hot-potato-react-demo-v1";
 
 export const SPUD = {
   riskFundTots: 6,
-  riskFundSpud: 10,
+  riskFundSpud: 6,
+  moveChunkSpud: 6,
   rewardedAdTots: 12,
   rewardedAdRevenue: 0.018,
   sponsorBreakTots: 5,

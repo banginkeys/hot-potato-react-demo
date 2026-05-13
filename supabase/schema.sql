@@ -34,9 +34,17 @@ create table if not exists public.players (
   handle text not null unique,
   avatar_id integer not null default 0,
   wallet text,
+  recovery_code_hash text,
+  game_state jsonb not null default '{}'::jsonb,
   last_seen_at timestamptz not null default now(),
   created_at timestamptz not null default now()
 );
+
+alter table public.players
+  add column if not exists recovery_code_hash text;
+
+alter table public.players
+  add column if not exists game_state jsonb not null default '{}'::jsonb;
 
 create index if not exists players_last_seen_at_idx
   on public.players (last_seen_at desc);
