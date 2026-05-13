@@ -1395,6 +1395,30 @@ small {
   background: radial-gradient(circle at 34% 30%, #ffd2c9, #ff3325 68%);
 }
 
+.gear-icon-sizzle::before {
+  left: 6px;
+  top: 8px;
+  width: 30px;
+  height: 24px;
+  border-radius: 20px 20px 9px 9px;
+  background:
+    radial-gradient(circle at 50% 78%, #26143f 0 4px, transparent 5px),
+    conic-gradient(from 225deg, #55e4ff 0 24%, #ffe25a 25% 57%, #ff6045 58% 78%, transparent 79%),
+    linear-gradient(180deg, #fff, #d8fbff);
+  box-shadow: inset 0 0 0 3px rgba(43, 21, 81, 0.24), 0 4px 0 rgba(43, 21, 81, 0.13);
+}
+
+.gear-icon-sizzle::after {
+  left: 19px;
+  top: 20px;
+  width: 16px;
+  height: 4px;
+  border-radius: 999px;
+  background: #ff4b31;
+  transform-origin: 2px 50%;
+  transform: rotate(-30deg);
+}
+
 .gear-card em {
   min-width: 30px;
   height: 30px;
@@ -2310,6 +2334,7 @@ small {
 .stage-fire,
 .golden-window,
 .overdrive-gauge,
+.sizzle-meter,
 .baby-hands-badge {
   pointer-events: none;
 }
@@ -2830,6 +2855,129 @@ small {
   animation: boostPush 420ms cubic-bezier(.45,0,.18,1) infinite alternate;
 }
 
+.sizzle-meter {
+  --sizzle-level: 1%;
+  position: absolute;
+  z-index: 15;
+  right: 0.85rem;
+  top: 5.3rem;
+  width: min(240px, 40%);
+  display: grid;
+  gap: 0.45rem;
+  padding: 0.72rem;
+  border-radius: 22px;
+  color: #fff;
+  background:
+    radial-gradient(circle at 78% 16%, rgba(255, 238, 111, 0.42), transparent 32%),
+    linear-gradient(145deg, #26143f, #0e7085 58%, #ff6748);
+  border: 2px solid rgba(255, 255, 255, 0.72);
+  box-shadow: 0 18px 34px rgba(34, 11, 58, 0.28), inset 0 0 0 2px rgba(255, 255, 255, 0.12);
+  filter: drop-shadow(0 10px 18px rgba(45, 15, 69, 0.22));
+  animation: sizzleMeterIn 260ms cubic-bezier(.16, 1, .3, 1) both, sizzleMeterTense 360ms ease-in-out infinite alternate;
+}
+
+.sizzle-meter.danger,
+.sizzle-meter.critical {
+  animation-duration: 260ms, 190ms;
+}
+
+.sizzle-meter-head {
+  display: flex;
+  justify-content: space-between;
+  gap: 0.6rem;
+  align-items: center;
+}
+
+.sizzle-meter-head small {
+  color: rgba(255, 255, 255, 0.78);
+  text-transform: uppercase;
+}
+
+.sizzle-meter-head strong {
+  color: #fff36f;
+  font-size: 1.05rem;
+}
+
+.sizzle-meter.critical .sizzle-meter-head strong {
+  color: #ffcec4;
+  text-shadow: 0 0 14px rgba(255, 76, 45, 0.8);
+}
+
+.sizzle-meter-dial {
+  position: relative;
+  height: 82px;
+  overflow: hidden;
+  border-radius: 82px 82px 14px 14px;
+  background:
+    radial-gradient(circle at 50% 100%, #26143f 0 10px, transparent 11px),
+    conic-gradient(from 225deg at 50% 100%, #55e4ff 0 26%, #ffe25a 27% 55%, #ff6045 56% 76%, transparent 77%),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.94), rgba(255, 255, 255, 0.48));
+  box-shadow: inset 0 -8px 18px rgba(38, 20, 63, 0.22);
+}
+
+.sizzle-meter-dial span {
+  position: absolute;
+  left: 50%;
+  bottom: 8px;
+  width: 4px;
+  height: 62px;
+  border-radius: 999px;
+  background: #ff3d28;
+  transform-origin: 50% 100%;
+  transform: translateX(-50%) rotate(calc(-70deg + var(--sizzle-needle) * 1.4deg));
+  filter: drop-shadow(0 0 8px rgba(255, 56, 36, 0.62));
+  transition: transform 220ms ease;
+}
+
+.sizzle-meter-dial i {
+  position: absolute;
+  left: 50%;
+  bottom: 0;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: radial-gradient(circle at 35% 30%, #fff1b6, #ff3d28 64%);
+  transform: translateX(-50%);
+}
+
+.sizzle-meter-track {
+  height: 13px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.32);
+  box-shadow: inset 0 0 0 2px rgba(255, 255, 255, 0.18);
+}
+
+.sizzle-meter-track b {
+  display: block;
+  width: var(--sizzle-level);
+  height: 100%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, #56e8ff, #fff36f 54%, #ff4a32);
+  box-shadow: 0 0 16px rgba(255, 222, 72, 0.72);
+  transition: width 220ms ease;
+}
+
+.sizzle-meter-readout {
+  display: flex;
+  justify-content: space-between;
+  gap: 0.55rem;
+  align-items: center;
+  color: rgba(255, 255, 255, 0.92);
+  font-size: 0.78rem;
+  font-weight: 1000;
+}
+
+.sizzle-meter-readout em {
+  min-width: 34px;
+  padding: 0.2rem 0.34rem;
+  border-radius: 999px;
+  color: #32163f;
+  background: #fff7af;
+  font-style: normal;
+  text-align: center;
+}
+
 .overdrive-btn {
   color: #fff;
   background: linear-gradient(90deg, #10d8ff, #7944ff 48%, #ff3aa1);
@@ -2844,6 +2992,16 @@ small {
 @keyframes gaugeIn {
   from { transform: translateX(-20px) scale(.86); opacity: 0; }
   to { transform: translateX(0) scale(1); opacity: 1; }
+}
+
+@keyframes sizzleMeterIn {
+  from { transform: translateX(18px) scale(0.86) rotate(2deg); opacity: 0; }
+  to { transform: translateX(0) scale(1) rotate(0deg); opacity: 1; }
+}
+
+@keyframes sizzleMeterTense {
+  from { filter: drop-shadow(0 10px 18px rgba(45, 15, 69, 0.22)) saturate(1); }
+  to { filter: drop-shadow(0 14px 24px rgba(255, 69, 42, 0.28)) saturate(1.22); }
 }
 
 @keyframes boostReady {
@@ -4557,6 +4715,70 @@ small {
   transform-origin: 30% 88%;
 }
 
+.sizzle-meter-tool-fx {
+  inset: -12% -15% -6%;
+  z-index: 14;
+}
+
+.sizzle-device {
+  position: absolute;
+  right: 0;
+  top: 16%;
+  width: 98px;
+  height: 74px;
+  opacity: 0;
+  border-radius: 28px 28px 16px 16px;
+  background:
+    radial-gradient(circle at 50% 82%, #251440 0 8px, transparent 9px),
+    conic-gradient(from 225deg at 50% 82%, #55e4ff 0 27%, #fff36f 28% 58%, #ff583d 59% 78%, transparent 79%),
+    linear-gradient(180deg, #fff, #bdf5ff);
+  box-shadow: inset 0 0 0 4px rgba(41, 20, 72, 0.22), 0 14px 24px rgba(36, 15, 62, 0.24);
+  transform-origin: 28% 82%;
+}
+
+.sizzle-device i,
+.sizzle-device b {
+  position: absolute;
+  display: block;
+  content: "";
+}
+
+.sizzle-device i {
+  left: 47px;
+  bottom: 8px;
+  width: 4px;
+  height: 42px;
+  border-radius: 999px;
+  background: #ff3d28;
+  transform-origin: 50% 100%;
+  transform: rotate(calc(-70deg + var(--sizzle-needle, 45) * 1.4deg));
+}
+
+.sizzle-device b {
+  left: 44px;
+  bottom: -18px;
+  width: 22px;
+  height: 34px;
+  border-radius: 0 0 999px 999px;
+  background: linear-gradient(180deg, #2ee4ff, #173454);
+  transform: rotate(26deg);
+}
+
+.sizzle-beam {
+  position: absolute;
+  right: 27%;
+  top: 40%;
+  width: 106px;
+  height: 80px;
+  opacity: 0;
+  border-radius: 50%;
+  background:
+    radial-gradient(ellipse at 40% 48%, rgba(255, 245, 115, 0.48), transparent 58%),
+    repeating-radial-gradient(circle at 52% 52%, rgba(85, 228, 255, 0.34) 0 3px, transparent 4px 12px);
+  filter: blur(1px) drop-shadow(0 0 16px rgba(255, 236, 80, 0.72));
+  mix-blend-mode: screen;
+}
+
 .foil-tool-fx {
   inset: -5% -15% -2%;
 }
@@ -4750,6 +4972,18 @@ small {
   animation: thermometerProbe 1.18s cubic-bezier(.18, .84, .18, 1) both;
 }
 
+.potato-wrap.sizzle-meter-active .sizzle-meter-tool-fx {
+  animation: sizzleToolLayer 1.08s linear both;
+}
+
+.potato-wrap.sizzle-meter-active .sizzle-device {
+  animation: sizzleDeviceScan 1.08s cubic-bezier(.16, .84, .2, 1) both;
+}
+
+.potato-wrap.sizzle-meter-active .sizzle-beam {
+  animation: sizzleBeamPulse 920ms ease-out 180ms both;
+}
+
 .potato-wrap.foil-wrapped .foil-tool-fx {
   animation: foilToolLayer 1s linear both;
 }
@@ -4849,6 +5083,26 @@ small {
   63% { opacity: 1; transform: translate(-12px, -10px) rotate(-36deg) scale(1.08); filter: drop-shadow(0 0 20px rgba(255, 230, 72, 0.86)); }
   80% { opacity: 1; transform: translate(-1px, -3px) rotate(-22deg) scale(0.94); }
   100% { opacity: 0; transform: translate(54px, 32px) rotate(20deg) scale(0.72); }
+}
+
+@keyframes sizzleToolLayer {
+  0%, 100% { opacity: 1; }
+}
+
+@keyframes sizzleDeviceScan {
+  0% { opacity: 0; transform: translate(82px, -42px) rotate(34deg) scale(0.58); }
+  16% { opacity: 1; transform: translate(35px, -18px) rotate(18deg) scale(0.88); }
+  36% { opacity: 1; transform: translate(4px, 1px) rotate(-15deg) scale(1.02); }
+  64% { opacity: 1; transform: translate(-3px, 6px) rotate(-22deg) scale(1.08); filter: drop-shadow(0 0 18px rgba(255, 238, 77, 0.86)); }
+  82% { opacity: 1; transform: translate(16px, -6px) rotate(5deg) scale(0.94); }
+  100% { opacity: 0; transform: translate(78px, -38px) rotate(30deg) scale(0.62); }
+}
+
+@keyframes sizzleBeamPulse {
+  0% { opacity: 0; transform: translate(34px, -16px) scale(0.28) rotate(-8deg); }
+  36% { opacity: 0.95; transform: translate(8px, 0) scale(0.88) rotate(4deg); }
+  68% { opacity: 0.75; transform: translate(-4px, 8px) scale(1.1) rotate(-4deg); }
+  100% { opacity: 0; transform: translate(-8px, 12px) scale(1.3) rotate(6deg); }
 }
 
 @keyframes mittReady {
@@ -5490,6 +5744,32 @@ small {
     width: min(42vw, 190px);
   }
 
+  .sizzle-meter {
+    right: 0.55rem;
+    top: 5.6rem;
+    width: min(46vw, 190px);
+    gap: 0.32rem;
+    padding: 0.54rem;
+    border-radius: 18px;
+  }
+
+  .sizzle-meter-dial {
+    height: 62px;
+  }
+
+  .sizzle-meter-dial span {
+    height: 46px;
+  }
+
+  .sizzle-meter-head small,
+  .sizzle-meter-readout {
+    font-size: 0.62rem;
+  }
+
+  .sizzle-meter-head strong {
+    font-size: 0.86rem;
+  }
+
   .overdrive-gauge {
     left: 0.45rem;
     top: 5.4rem;
@@ -5732,6 +6012,26 @@ small {
     left: 8px;
     top: 88px;
     width: 54px;
+  }
+
+  .sizzle-meter {
+    right: 8px;
+    top: 86px;
+    width: min(178px, 44vw);
+    padding: 0.5rem;
+    border-radius: 18px;
+  }
+
+  .sizzle-meter-dial {
+    height: 58px;
+  }
+
+  .sizzle-meter-dial span {
+    height: 42px;
+  }
+
+  .sizzle-meter-readout {
+    font-size: 0.62rem;
   }
 
   .baby-hands-badge {
@@ -6668,6 +6968,44 @@ small {
     left: 7px;
     top: 76px;
     width: 48px;
+  }
+
+  .sizzle-meter {
+    right: 7px;
+    top: 72px;
+    width: min(154px, 45vw);
+    gap: 0.26rem;
+    padding: 0.44rem;
+    border-radius: 16px;
+  }
+
+  .sizzle-meter-head small {
+    font-size: 0.5rem;
+  }
+
+  .sizzle-meter-head strong {
+    font-size: 0.76rem;
+  }
+
+  .sizzle-meter-dial {
+    height: 50px;
+  }
+
+  .sizzle-meter-dial span {
+    height: 36px;
+  }
+
+  .sizzle-meter-track {
+    height: 9px;
+  }
+
+  .sizzle-meter-readout {
+    font-size: 0.54rem;
+  }
+
+  .sizzle-meter-readout em {
+    min-width: 28px;
+    padding: 0.14rem 0.24rem;
   }
 
   .risk-ad {

@@ -55,6 +55,14 @@ export const equipment = {
     icon: "thermo",
     description: "Reveal exact SPUD inside this potato.",
     tip: "Scout a high-stakes potato before deciding."
+  },
+  sizzleMeter: {
+    name: "Sizzle Meter",
+    cost: 52,
+    use: "Scan",
+    icon: "sizzle",
+    description: "Briefly reveal how close this potato is to popping.",
+    tip: "A short danger readout. It does not make the potato safer."
   }
 };
 

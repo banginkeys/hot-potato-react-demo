@@ -280,7 +280,8 @@ const equipmentUnlocks = [
   { key: "ovenMitts", label: "Pass 5 potatoes", unlocked: (game) => game.passes >= 5 || game.explosions >= 1 },
   { key: "sourCream", label: "Win 60 SPUD", unlocked: (game) => game.won >= 60 || game.passes >= 8 },
   { key: "hotSauce", label: "Reach streak 5", unlocked: (game) => game.bestStreak >= 5 || game.passes >= 12 },
-  { key: "thermometer", label: "Win 150 SPUD", unlocked: (game) => game.won >= 150 || game.bestWin >= 50 || game.passes >= 16 }
+  { key: "thermometer", label: "Win 150 SPUD", unlocked: (game) => game.won >= 150 || game.bestWin >= 50 || game.passes >= 16 },
+  { key: "sizzleMeter", label: "Reach streak 8", unlocked: (game) => game.bestStreak >= 8 || game.won >= 240 || game.passes >= 22 }
 ];
 
 function isEquipmentUnlocked(game, key) {
@@ -323,6 +324,13 @@ function gearUnlockProgress(game, key) {
       { label: "SPUD won", value: game.won, goal: 150 },
       { label: "best single win", value: game.bestWin, goal: 50 },
       { label: "passes", value: game.passes, goal: 16 }
+    ]);
+  }
+  if (key === "sizzleMeter") {
+    return bestGearMilestone([
+      { label: "best streak", value: game.bestStreak, goal: 8 },
+      { label: "SPUD won", value: game.won, goal: 240 },
+      { label: "passes", value: game.passes, goal: 22 }
     ]);
   }
   return { label: "progress", value: 0, goal: 1, percent: 0 };
@@ -2656,6 +2664,10 @@ export default function App() {
         p.equipment.thermometer = true;
         p.equipment.thermometerFx = Date.now();
         playSfx("tap");
+      } else if (key === "sizzleMeter") {
+        p.equipment.sizzleMeterTicks = 4;
+        p.equipment.sizzleMeterFx = Date.now();
+        playSfx("power");
       }
       return addLog({ ...markGuidesSeen(old, "equipment"), potato: p, equipment: inv }, `${equipment[key].name} used on this potato.`, "info");
     });
@@ -3203,6 +3215,8 @@ function PotatoStage({ game, heatScore, coins, babyCry, overdriveBoost, onBadVid
   const overdriveReady = p?.power === "overdrive" && !game.overdriveActive;
   const overdriveActive = p?.power === "overdrive" && game.overdriveActive;
   const gear = p?.equipment || {};
+  const sizzleActive = (gear.sizzleMeterTicks || 0) > 0;
+  const sizzlePercent = sizzleMeterPercent(p, game.holding);
   const potatoImage = p?.assetPath ? assetUrl(p.assetPath) : p ? assetUrl("Generic Potatoes Transparent", p.file) : "";
   const pigeonPotato = p?.socialKind === "pigeon";
 
@@ -3241,15 +3255,18 @@ function PotatoStage({ game, heatScore, coins, babyCry, overdriveBoost, onBadVid
           {game.babyHandsRounds > 0 && <BabyHandsBadge rounds={game.babyHandsRounds} crying={babyCry} />}
           {(golden || goldenClosed) && <GoldenWindow active={golden} urgent={goldenWindowUrgent(p)} closed={goldenClosed} />}
           {(overdriveReady || overdriveActive) && <OverdriveGauge active={overdriveActive} boost={overdriveBoost || 60} />}
+          {sizzleActive && <SizzleMeter percent={sizzlePercent} seconds={gear.sizzleMeterTicks || 0} />}
           <EquipmentStatus gear={gear} />
           <StageFire heatScore={heatScore} holding={game.holding} />
           <div className="potato-anchor">
             <div
-              className={`potato-wrap ${landing ? `throw-in-${p.throwSide || "left"}` : ""} ${game.holding ? "holding" : ""} ${heatScore > 0.45 ? "hot" : ""} ${steam ? "steaming" : ""} ${smoke ? "smoking" : ""} ${burning ? "burning" : ""} ${gear.sourCreamTicks > 0 ? "sour-cream-active" : ""} ${gear.hotSauceSquirts ? "hot-sauce-active" : ""} ${gear.thermometer ? "thermometer-active" : ""} ${gear.foilWrap ? "foil-wrapped" : ""} ${gear.ovenMitts ? "mitts-on" : ""}`}
+              className={`potato-wrap ${landing ? `throw-in-${p.throwSide || "left"}` : ""} ${game.holding ? "holding" : ""} ${heatScore > 0.45 ? "hot" : ""} ${steam ? "steaming" : ""} ${smoke ? "smoking" : ""} ${burning ? "burning" : ""} ${gear.sourCreamTicks > 0 ? "sour-cream-active" : ""} ${gear.hotSauceSquirts ? "hot-sauce-active" : ""} ${gear.thermometer ? "thermometer-active" : ""} ${sizzleActive ? "sizzle-meter-active" : ""} ${gear.foilWrap ? "foil-wrapped" : ""} ${gear.ovenMitts ? "mitts-on" : ""}`}
               style={{
                 "--steam-intensity": clamp((p.age - 5) / 24, 0, 1),
                 "--smoke-intensity": clamp((p.age - 24) / 40, 0, 1),
-                "--sauce-level": clamp((gear.hotSauceSquirts || 0) / 3, 0, 1)
+                "--sauce-level": clamp((gear.hotSauceSquirts || 0) / 3, 0, 1),
+                "--sizzle-level": `${sizzlePercent}%`,
+                "--sizzle-needle": sizzlePercent
               }}
             >
               <div className="heat-halo" />
@@ -3341,6 +3358,7 @@ function EquipmentStatus({ gear }) {
   if (gear.hotSauceBottle || gear.hotSauceSquirts) chips.push(["spicy", `Hot Sauce ${gear.hotSauceSquirts || 0}/3`]);
   if (gear.foilWrap) chips.push(["safe", "Foil Wrap"]);
   if (gear.thermometer) chips.push(["cool", "Thermometer"]);
+  if (gear.sizzleMeterTicks > 0) chips.push(["spicy", `Sizzle Meter ${gear.sizzleMeterTicks}s`]);
   if (!chips.length) return null;
   return (
     <div className="equipment-status">
@@ -3367,6 +3385,10 @@ function EquipmentFx({ gear = {} }) {
       </div>
       <div key={`thermo-${gear.thermometerFx || Number(!!gear.thermometer)}`} className="equipment-tool-fx thermometer-tool-fx" aria-hidden="true">
         <img src={assetUrl("Equipment", "thermometer.svg")} alt="" />
+      </div>
+      <div key={`sizzle-${gear.sizzleMeterFx || gear.sizzleMeterTicks || 0}`} className="equipment-tool-fx sizzle-meter-tool-fx" aria-hidden="true">
+        <span className="sizzle-device"><i /><b /></span>
+        <span className="sizzle-beam" />
       </div>
       <div key={`foil-${gear.foilWrapFx || Number(!!gear.foilWrap)}`} className="equipment-tool-fx foil-tool-fx" aria-hidden="true">
         <span className="foil-sheet sheet-one" />
@@ -3541,6 +3563,24 @@ function OverdriveGauge({ active, boost }) {
   );
 }
 
+function SizzleMeter({ percent, seconds }) {
+  const safePercent = clamp(percent, 1, 99);
+  return (
+    <div className={`sizzle-meter ${safePercent >= 82 ? "critical" : safePercent >= 64 ? "danger" : ""}`} style={{ "--sizzle-level": `${safePercent}%`, "--sizzle-needle": safePercent }}>
+      <div className="sizzle-meter-head">
+        <small>Sizzle Meter</small>
+        <strong>{sizzleMeterLabel(safePercent)}</strong>
+      </div>
+      <div className="sizzle-meter-dial">
+        <span />
+        <i />
+      </div>
+      <div className="sizzle-meter-track"><b /></div>
+      <div className="sizzle-meter-readout">{safePercent}% pop pressure <em>{seconds}s</em></div>
+    </div>
+  );
+}
+
 function GameControls({ game, passLabel, currentPassCost, overdriveBoost, gearOpen, register, toggleHold, passPotato, sendPotato, activateOverdrive, startSponsorBreak, toggleGear, useEquipment }) {
   const p = game.potato;
   const canPass = !p || game.tots >= currentPassCost;
@@ -3548,7 +3588,12 @@ function GameControls({ game, passLabel, currentPassCost, overdriveBoost, gearOp
   const golden = goldenWindowActive(p);
   const potatoOrigin = p ? `${p.rarity} - sent by ${p.sender}` : "Waiting for a valid delivery window.";
   const ownedGear = Object.values(game.equipment || {}).reduce((sum, count) => sum + Math.max(0, Number(count) || 0), 0);
-  const activeGear = p ? Object.entries(p.equipment || {}).filter(([key, value]) => key !== "hotSauceSquirts" && value).length : 0;
+  const activeGear = p ? Object.entries(p.equipment || {}).filter(([key, value]) => (
+    value
+    && key !== "hotSauceSquirts"
+    && !key.endsWith("Fx")
+    && !key.endsWith("Ticks")
+  )).length : 0;
   return (
     <div className="details">
       <div className="between">
@@ -3560,7 +3605,7 @@ function GameControls({ game, passLabel, currentPassCost, overdriveBoost, gearOp
       </div>
       <div className="vibes">
         <div className="stat"><small>Prize Pile</small><strong>{p?.equipment?.thermometer ? fmt(p.pool) : p ? "Growing" : "Empty"}</strong><span>{p?.equipment?.thermometer ? "Thermometer readout" : "Visual estimate"}</span></div>
-        <div className="stat"><small>Vibe</small><strong>{p ? vibeText(p.age) : "Empty"}</strong><span>No exact explosion hint</span></div>
+        <div className="stat"><small>Vibe</small><strong>{p?.equipment?.sizzleMeterTicks > 0 ? `${sizzleMeterPercent(p, game.holding)}%` : p ? vibeText(p.age) : "Empty"}</strong><span>{p?.equipment?.sizzleMeterTicks > 0 ? "Sizzle Meter pop pressure" : "No exact explosion hint"}</span></div>
         <div className={`stat streak-stat ${game.pendingPower ? "armed" : ""}`}><small>Streak</small><strong>{fmt(game.streak)}</strong><span>{game.pendingPower ? `${powerName(game.pendingPower)} next` : "Spud Sac resets it"}</span></div>
         <div className="stat"><small>In Play / Held</small><strong>{p ? `${Math.floor(p.age)}s / ${Math.floor(p.held)}s` : "0s / 0s"}</strong><span>Time vs hold time</span></div>
       </div>
@@ -3624,7 +3669,9 @@ function QuickGearBar({ game, useEquipment }) {
     const owned = (game.equipment?.[key] || 0) > 0;
     const active = key === "sourCream"
       ? (p.equipment?.sourCreamTicks || 0) > 0
-      : !!p.equipment?.[key] || (key === "hotSauce" && !!p.equipment?.hotSauceBottle);
+      : key === "sizzleMeter"
+        ? (p.equipment?.sizzleMeterTicks || 0) > 0
+        : !!p.equipment?.[key] || (key === "hotSauce" && !!p.equipment?.hotSauceBottle);
     return owned || active;
   });
   if (!quickItems.length) return null;
@@ -3634,7 +3681,11 @@ function QuickGearBar({ game, useEquipment }) {
         const count = game.equipment?.[key] || 0;
         const hotSauceBottle = key === "hotSauce" && p.equipment?.hotSauceBottle;
         const hotSauceSquirts = p.equipment?.hotSauceSquirts || 0;
-        const active = key === "sourCream" ? (p.equipment?.sourCreamTicks || 0) > 0 : !!p.equipment?.[key] || hotSauceBottle;
+        const active = key === "sourCream"
+          ? (p.equipment?.sourCreamTicks || 0) > 0
+          : key === "sizzleMeter"
+            ? (p.equipment?.sizzleMeterTicks || 0) > 0
+            : !!p.equipment?.[key] || hotSauceBottle;
         const canUse = key === "hotSauce"
           ? (count > 0 && !hotSauceBottle) || (hotSauceBottle && hotSauceSquirts < 3)
           : count > 0 && !active;
@@ -3705,6 +3756,8 @@ function EquipmentDrawer({ game, open, close, buyEquipment, useEquipment }) {
             const hotSauceSquirts = game.potato?.equipment?.hotSauceSquirts || 0;
             const active = key === "sourCream"
               ? (game.potato?.equipment?.sourCreamTicks || 0) > 0
+              : key === "sizzleMeter"
+                ? (game.potato?.equipment?.sizzleMeterTicks || 0) > 0
               : game.potato?.equipment?.[key] || hotSauceBottle || (key === "hotSauce" && hotSauceSquirts);
             const canUse = key === "hotSauce"
               ? !!game.potato && ((count > 0 && !hotSauceBottle) || (hotSauceBottle && hotSauceSquirts < 3))
@@ -4467,6 +4520,23 @@ function vibeText(age) {
   if (age > 34) return "Twitchy";
   if (age > 18) return "Warm";
   return "Too calm";
+}
+
+function sizzleMeterPercent(p, holding = false) {
+  if (!p) return 0;
+  const fusePressure = clamp(1 - p.fuse / 72, 0, 1);
+  const chancePressure = clamp(explosionChance(p, holding) / (holding ? 0.16 : 0.095), 0, 1);
+  const agePressure = clamp((p.age - p.safeUntil) / 92, 0, 1);
+  const heatPressure = clamp((p.heat || 0) / 105, 0, 1);
+  const pressure = fusePressure * 0.42 + chancePressure * 0.34 + agePressure * 0.14 + heatPressure * 0.1;
+  return clamp(Math.round(pressure * 100), 1, 99);
+}
+
+function sizzleMeterLabel(percent) {
+  if (percent >= 82) return "RUN";
+  if (percent >= 64) return "DANGER";
+  if (percent >= 42) return "RISING";
+  return "LOW";
 }
 
 function powerName(power) {

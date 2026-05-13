@@ -84,6 +84,7 @@ export function advancePotato(p, holding, powerGrowth = 1) {
   };
   if (next.equipment.sourCreamTicks > 0) next.equipment.sourCreamTicks -= 1;
   if (next.equipment.hotSauceTicks > 0) next.equipment.hotSauceTicks -= 1;
+  if (next.equipment.sizzleMeterTicks > 0) next.equipment.sizzleMeterTicks -= 1;
   const growthMult = equipmentGrowthMultiplier(next) * clamp(powerGrowth, 1, 8);
   const stressMult = equipmentStressMultiplier(next, holding);
   const holdingBoost = holding ? 1 : 0;

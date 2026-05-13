@@ -114,9 +114,13 @@ function copySourceTreeToPublic(pathParts, extensions) {
 }
 
 function fileContentKey(file) {
-  const stats = statSync(file);
-  const hash = createHash("sha256").update(readFileSync(file)).digest("hex");
-  return `${stats.size}:${hash}`;
+  try {
+    const stats = statSync(file);
+    const hash = createHash("sha256").update(readFileSync(file)).digest("hex");
+    return `${stats.size}:${hash}`;
+  } catch {
+    return null;
+  }
 }
 
 function generatedPublicMediaFiles(pathParts, extensions) {
@@ -129,6 +133,7 @@ function generatedPublicMediaFiles(pathParts, extensions) {
       const stats = statSync(full);
       if (stats.size <= 0) return false;
       const key = fileContentKey(full);
+      if (!key) return false;
       if (seenContent.has(key)) return false;
       seenContent.add(key);
       return true;
@@ -148,24 +153,54 @@ function generatedSoundFiles(pathParts, outputName) {
       const safeName = `${String(index + 1).padStart(2, "0")}-${safeSoundName(file)}`;
       const source = join(assetsRoot, ...pathParts, file);
       const destination = join(outDir, safeName);
+      const sourceSize = statSync(source).size;
+      if (sourceSize <= 0) return;
+      if (existsSync(destination)) {
+        const destinationSize = statSync(destination).size;
+        if (destinationSize === sourceSize && fileContentKey(destination)) return;
+      }
       try {
         copyFileSync(source, destination);
       } catch (error) {
         if (error?.code === "EPERM") {
+          const destinationSize = existsSync(destination) ? statSync(destination).size : -1;
+          if (sourceSize > 0 && sourceSize === destinationSize) return;
           try {
             writeFileSync(destination, readFileSync(source));
             return;
           } catch {
-            const sourceSize = statSync(source).size;
-            const destinationSize = existsSync(destination) ? statSync(destination).size : -1;
-            if (sourceSize === destinationSize) return;
+            const dot = safeName.lastIndexOf(".");
+            const base = dot >= 0 ? safeName.slice(0, dot) : safeName;
+            const ext = dot >= 0 ? safeName.slice(dot) : "";
+            for (let attempt = 1; attempt <= 5; attempt += 1) {
+              const altName = `${base}-copy${attempt === 1 ? "" : attempt}${ext}`;
+              const altDestination = join(outDir, altName);
+              try {
+                copyFileSync(source, altDestination);
+                return;
+              } catch {
+                try {
+                  writeFileSync(altDestination, readFileSync(source));
+                  return;
+                } catch {
+                  // Try the next alternate name; Windows can briefly lock generated audio files.
+                }
+              }
+            }
           }
         }
         throw error;
       }
     });
   }
-  return filesInDir(outDir, [".wav", ".mp3", ".ogg"]).map((safeName) => {
+  return filesInDir(outDir, [".wav", ".mp3", ".ogg"]).filter((safeName) => {
+    const full = join(outDir, safeName);
+    const stats = statSync(full);
+    if (stats.size <= 0) return false;
+    const key = fileContentKey(full);
+    if (!key) return false;
+    return true;
+  }).map((safeName) => {
     const importName = `sound_${soundImports.length}`;
     soundImports.push(`import ${importName} from ${JSON.stringify(`./__generated_sounds/${outputName}/${safeName}?url`)};`);
     return assetRef(importName);
