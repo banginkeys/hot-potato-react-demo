@@ -225,35 +225,30 @@ function soundCheckEnabled() {
 function secretSocialCopy(invite) {
   if (!invite) return "";
   const from = invite.from || "A friend";
-  if (invite.kind === "normal") return `${from} tossed you a Hot Potato.`;
+  if (invite.kind === "normal") return `${from} tossed you a Friend Toss.`;
   if (invite.kind === "pigeon") return `A Pigeon Potato from ${from} is circling with a hidden note.`;
   if (invite.kind === "golden") return `A Golden Potato from ${from} is headed your way.`;
   if (invite.kind === "tainted") return `A suspicious Tater from ${from} is headed your way.`;
-  return "A mystery Hot Potato is headed your way.";
+  return "A mystery friend potato is headed your way.";
 }
 
 function socialLandingCopy(social) {
   if (!social) return "";
   const from = social.from || "A friend";
-  if (social.kind === "normal") return `${from} tossed you a Hot Potato.`;
+  if (social.kind === "normal") return `A Friend Toss from ${from} landed.`;
+  if (social.kind === "tainted") return `A Tainted Tater from ${from} landed.`;
   if (social.kind === "golden") return `A Golden Potato from ${from} landed.`;
   if (social.kind === "pigeon") return `A message potato from ${from} fluttered in.`;
-  return "A Hot Potato landed. It feels... personal.";
+  return "A friend potato landed. It feels... personal.";
 }
 
 function socialQueueToast(social, game) {
-  if (social?.kind === "normal") return `${social.from || "A friend"} passed you a Hot Potato.`;
-  const label = social?.kind === "pigeon"
-    ? "Pigeon Potato"
-    : social?.kind === "golden"
-      ? "Golden Potato"
-      : social?.kind === "tainted"
-        ? "Tainted Tater"
-        : "Friend potato";
+  const label = socialPotatoLabel(social?.kind);
+  const from = social?.from || "A friend";
   if (game.risk <= 0) return `${label} waiting. Add SPUD to the Spud Pile.`;
   if (game.potato) return `${label} queued after this potato.`;
   if (deliveryProtectionActive(game)) return `${label} waits until sleep/snooze ends.`;
-  return `${label} is next.`;
+  return `${label} from ${from} is next.`;
 }
 
 function adFileAtIndex(index, excluded = []) {
@@ -427,9 +422,43 @@ const socialPotatoes = {
   }
 };
 
+const specialSocialKinds = new Set(["tainted", "golden", "pigeon"]);
+
+function isSpecialSocialKind(kind) {
+  return specialSocialKinds.has(String(kind || ""));
+}
+
+function socialPotatoLabel(kind) {
+  if (kind === "pigeon") return "Pigeon Potato";
+  if (kind === "golden") return "Golden Potato";
+  if (kind === "tainted") return "Tainted Tater";
+  return "Friend Potato";
+}
+
+function socialPotatoNotice(social, game) {
+  const label = socialPotatoLabel(social?.kind);
+  const from = social?.from || "A friend";
+  if (social?.kind === "pigeon") {
+    return {
+      title: "Pigeon Potato incoming",
+      body: `${from} sent a hidden note.`
+    };
+  }
+  if (game?.risk <= 0) {
+    return {
+      title: `${label} waiting`,
+      body: `${from} sent it. Add SPUD to the Spud Pile to receive it.`
+    };
+  }
+  return {
+    title: `${label} incoming`,
+    body: `${from} sent it. It is next.`
+  };
+}
+
 function pickIncomingSocialPotato(potatoes = []) {
   const valid = potatoes.filter((item) => item?.id && socialPotatoes[item.kind]);
-  return valid.find((item) => item.kind !== "normal") || valid[0] || null;
+  return valid.find((item) => isSpecialSocialKind(item.kind)) || null;
 }
 
 function socialSpendable(game) {
@@ -556,7 +585,7 @@ async function claimBackendSocialPotato(id, claimedByName) {
   const params = new URLSearchParams({ id });
   if (claimedByName) params.set("claimedByName", claimedByName);
   const response = await fetch(`/.netlify/functions/social-potatoes-claim?${params}`);
-  return parseBackendResponse(response, "That Hot Potato link could not be claimed.");
+  return parseBackendResponse(response, "That friend potato link could not be claimed.");
 }
 
 async function upsertBackendPlayer(game) {
@@ -621,7 +650,7 @@ function readSocialInvite() {
   if (typeof window === "undefined") return null;
   const params = new URLSearchParams(window.location.search);
   const kind = params.get("socialPotato");
-  if (!socialPotatoes[kind]) return null;
+  if (!isSpecialSocialKind(kind)) return null;
   return {
     kind,
     from: (params.get("from") || "A friend").slice(0, 24),
@@ -742,6 +771,7 @@ function loadGame() {
       ...loaded,
       playerId: coercePlayerId(loaded.playerId) || getOrCreatePlayerId(),
       profileCode: cleanSecretRecipe(loaded.profileCode) || getOrCreateSecretRecipe(),
+      pendingSocialPotato: isSpecialSocialKind(loaded.pendingSocialPotato?.kind) ? loaded.pendingSocialPotato : null,
       tipsEnabled: loaded.tipsEnabled ?? !!loaded.onboarded,
       holding: false,
       potato: null,
@@ -819,6 +849,52 @@ function emptyStageInfo(game) {
       title: `${protection.status}: potatoes paused`,
       body: "Hot Potatoes will not arrive until your protection window is open.",
       meta: protection.note
+    };
+  }
+  if (game.pendingSocialPotato) {
+    const label = socialPotatoLabel(game.pendingSocialPotato.kind);
+    const from = game.pendingSocialPotato.from || "A friend";
+    if (game.risk <= 0 && game.sac > 0) {
+      const amount = Math.min(SPUD.moveChunkSpud || SPUD.riskFundSpud, game.sac);
+      return {
+        tone: "social-waiting",
+        icon: "!",
+        title: `${label} waiting`,
+        body: `${from} sent it. Move SPUD into the Spud Pile to receive it.`,
+        action: "moveToPile",
+        actionLabel: `Risk: Move ${fmt(amount)} SPUD to Pile`,
+        meta: "Special potatoes wait for exposed SPUD."
+      };
+    }
+    if (game.risk <= 0 && game.tots >= SPUD.riskFundTots) {
+      return {
+        tone: "social-waiting",
+        icon: "!",
+        title: `${label} waiting`,
+        body: `${from} sent it. Convert Tots into Spud Pile SPUD to receive it.`,
+        action: "moveToPile",
+        actionLabel: `Risk: Move ${SPUD.riskFundSpud} SPUD to Pile`,
+        meta: "Special potatoes wait for exposed SPUD."
+      };
+    }
+    if (game.risk <= 0) {
+      const payout = rewardedAdPayout(game.ads);
+      return {
+        tone: "social-waiting",
+        icon: "!",
+        title: `${label} waiting`,
+        body: `${from} sent it. Earn Tots, then build your Spud Pile to receive it.`,
+        action: "watchAd",
+        actionLabel: `Watch Ad +${payout.tots} Tots`,
+        meta: "Special potatoes wait for exposed SPUD."
+      };
+    }
+    return {
+      tone: "social-waiting",
+      icon: "!",
+      title: `${label} incoming`,
+      body: `${from} sent it. It should land next.`,
+      meta: "Keep your hands ready."
     };
   }
   if (game.risk <= 0 && game.sac > 0) {
@@ -1080,7 +1156,8 @@ export default function App() {
       }, secretSocialCopy(socialInvite), "info");
     });
     showToast(socialQueueToast(socialInvite, game));
-    notifyPlayer(socialInvite.kind === "pigeon" ? "Pigeon Potato incoming" : "Hot Potato incoming", socialInvite.kind === "pigeon" ? `${socialInvite.from} sent a hidden note.` : "A social potato is waiting.");
+    const notice = socialPotatoNotice(socialInvite, game);
+    notifyPlayer(notice.title, notice.body);
     clearSocialInviteUrl();
     setSocialInvite(null);
   }, [socialInvite]);
@@ -1092,8 +1169,8 @@ export default function App() {
       try {
         const claimed = await claimBackendSocialPotato(giftLinkId, game.playerName);
         if (cancelled) return;
-        if (!claimed?.kind || !socialPotatoes[claimed.kind]) {
-          throw new Error("That Hot Potato link was empty.");
+        if (!claimed?.kind || !isSpecialSocialKind(claimed.kind)) {
+          throw new Error("That friend potato link is no longer available.");
         }
         setSocialInvite({
           kind: claimed.kind,
@@ -1104,7 +1181,7 @@ export default function App() {
         });
       } catch (error) {
         if (!cancelled) {
-          showToast(error.message || "That Hot Potato link could not be claimed.");
+          showToast(error.message || "That friend potato link could not be claimed.");
         }
       } finally {
         if (!cancelled) {
@@ -1506,7 +1583,7 @@ export default function App() {
       const incoming = pickIncomingSocialPotato(result.potatoes || []);
       if (!incoming) return;
       const claimed = await claimBackendSocialPotato(incoming.id, game.playerName);
-      if (!claimed?.kind || !socialPotatoes[claimed.kind]) return;
+      if (!claimed?.kind || !isSpecialSocialKind(claimed.kind)) return;
       const invite = {
         kind: claimed.kind,
         from: (claimed.from || incoming.from || "A friend").slice(0, 24),
@@ -1527,7 +1604,8 @@ export default function App() {
         }, secretSocialCopy(invite), "info");
       });
       showToast(socialQueueToast(invite, game));
-      notifyPlayer(invite.kind === "pigeon" ? "Pigeon Potato incoming" : "Hot Potato incoming", invite.kind === "pigeon" ? `${invite.from} sent a hidden note.` : "A social potato is waiting.");
+      const notice = socialPotatoNotice(invite, game);
+      notifyPlayer(notice.title, notice.body);
     } catch {
       // Keep social play non-blocking if the backend is temporarily unavailable.
     }
@@ -2444,12 +2522,16 @@ export default function App() {
           duration: 2400
         });
       }
-      if (target) {
-        createBackendSocialPotato("normal", old.playerName, target)
-          .then(() => showToast(`Passed to ${targetName}. They will see it when online.`))
-          .catch(() => showToast(`Passed to ${targetName} locally. Friend delivery is offline.`));
-      }
       setWalletPulsing(true);
+      const passCopy = receivedKind === "tainted"
+        ? `Survived ${sender}'s Tainted Tater. `
+        : receivedKind === "golden"
+          ? `Cashed ${sender}'s Golden Potato. `
+          : receivedKind === "pigeon"
+            ? `Opened ${sender}'s Pigeon Potato. `
+            : targetName
+              ? `Passed out toward ${targetName}. `
+              : "Passed the potato. ";
       return addLog({
         ...markGuidesSeen(old, "pass"),
         potato: null,
@@ -2472,7 +2554,7 @@ export default function App() {
         overdriveTaps: [],
         nextAt: Date.now() + POST_PASS_DELIVERY_MIN_MS + Math.random() * POST_PASS_DELIVERY_RANGE_MS,
         unlocked: { ...old.unlocked, activity: true, sac: true }
-      }, `${receivedKind === "tainted" ? `Survived ${sender}'s Tainted Tater. ` : receivedKind === "golden" ? `Cashed ${sender}'s Golden Potato. ` : receivedKind === "pigeon" ? `Opened ${sender}'s Pigeon Potato. ` : targetName ? `Passed to ${targetName}. ` : "Passed the Hot Potato. "}${golden ? "Golden Window +40%. " : ""}${overdriveBonus ? `Overdrive +${Math.round(overdriveBonus)}% fueled the pile. ` : ""}+${fmt(reward)} SPUD landed in the Spud Pile.`, "good");
+      }, `${passCopy}${golden ? "Golden Window +40%. " : ""}${overdriveBonus ? `Overdrive +${Math.round(overdriveBonus)}% fueled the pile. ` : ""}+${fmt(reward)} SPUD landed in the Spud Pile.`, "good");
     });
   }
 
@@ -3318,6 +3400,12 @@ function PotatoStage({ game, heatScore, coins, babyCry, overdriveBoost, onBadVid
       )}
       {p && (
         <>
+          {isSpecialSocialKind(p.socialKind) && (
+            <div className={`social-source-badge ${p.socialKind}`}>
+              <small>{socialPotatoLabel(p.socialKind)}</small>
+              <strong>From {p.sender || p.prankFrom || "a friend"}</strong>
+            </div>
+          )}
           {p.power && p.power !== "golden-window" && <PowerBanner power={p.power} active={p.power === "overdrive" ? game.overdriveActive : golden} />}
           {game.babyHandsRounds > 0 && <BabyHandsBadge rounds={game.babyHandsRounds} crying={babyCry} />}
           {(golden || goldenClosed) && <GoldenWindow active={golden} urgent={goldenWindowUrgent(p)} closed={goldenClosed} />}

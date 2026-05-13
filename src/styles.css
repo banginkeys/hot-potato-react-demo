@@ -652,7 +652,8 @@ small {
 
 .empty-stage.needs-pile,
 .empty-stage.needs-tots,
-.empty-stage.paused {
+.empty-stage.paused,
+.empty-stage.social-waiting {
   max-width: min(560px, 92%);
   padding: 1.05rem 1.1rem;
   border: 2px solid rgba(68, 38, 99, 0.1);
@@ -695,6 +696,15 @@ small {
   background: linear-gradient(145deg, #8e82ff, #2b1b69);
 }
 
+.empty-stage.social-waiting .big {
+  color: #fff;
+  background:
+    radial-gradient(circle at 32% 24%, rgba(255, 255, 255, 0.76), transparent 22%),
+    linear-gradient(145deg, #ffcf46, #ff7747 54%, #7b2fc9);
+  box-shadow: 0 0 0 6px rgba(255, 207, 70, 0.18), 0 18px 26px rgba(122, 47, 201, 0.18);
+  animation: emptyUrgentPulse 680ms ease-in-out infinite alternate;
+}
+
 .empty-stage p {
   color: #745f80;
   font-weight: 800;
@@ -713,6 +723,12 @@ small {
   color: #2e2440;
   background: linear-gradient(180deg, #85f1ff, #32c4ed 62%, #18a9d5);
   box-shadow: 0 6px 0 rgba(22, 128, 159, 0.32), 0 14px 24px rgba(50, 196, 237, 0.18);
+}
+
+.empty-stage.social-waiting .empty-stage-cta {
+  color: #2c1742;
+  background: linear-gradient(180deg, #ffe67e, #ffbd31 62%, #e98419);
+  box-shadow: 0 6px 0 rgba(145, 78, 12, 0.34), 0 14px 24px rgba(255, 189, 49, 0.18);
 }
 
 .empty-stage-meta {
@@ -741,6 +757,58 @@ small {
   width: min(330px, 78vw);
   height: min(370px, 86vw);
   pointer-events: none;
+}
+
+.social-source-badge {
+  position: absolute;
+  z-index: 9;
+  left: clamp(10px, 2.4vw, 22px);
+  top: clamp(10px, 2.4vw, 22px);
+  display: grid;
+  gap: 0.12rem;
+  max-width: min(320px, 58%);
+  padding: 0.58rem 0.78rem;
+  border-radius: 20px;
+  color: #2d1545;
+  background:
+    radial-gradient(circle at 12% 18%, rgba(255, 255, 255, 0.72), transparent 1.6rem),
+    linear-gradient(145deg, #fff8d7, #ffd867);
+  border: 2px solid rgba(255, 255, 255, 0.86);
+  box-shadow: 0 14px 26px rgba(47, 24, 78, 0.18);
+  pointer-events: none;
+}
+
+.social-source-badge small {
+  color: #7a4d00;
+  text-transform: uppercase;
+  letter-spacing: 0;
+  font-size: 0.66rem;
+  font-weight: 1000;
+}
+
+.social-source-badge strong {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: #26143f;
+  font-size: 0.95rem;
+  font-weight: 1000;
+}
+
+.social-source-badge.tainted {
+  color: #fff;
+  background: linear-gradient(145deg, #ff785c, #db2f44 58%, #5b236a);
+}
+
+.social-source-badge.tainted small,
+.social-source-badge.tainted strong,
+.social-source-badge.pigeon small,
+.social-source-badge.pigeon strong {
+  color: #fff;
+}
+
+.social-source-badge.pigeon {
+  background: linear-gradient(145deg, #6eeeff, #447bff 58%, #5b2aaa);
 }
 
 .potato-wrap {

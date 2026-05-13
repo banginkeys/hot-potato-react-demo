@@ -1,7 +1,7 @@
 import { json, parseJson, preflight, publicBaseUrl } from "./_lib/http.js";
 import { createSocialPotato } from "./_lib/supabase.js";
 
-const kinds = new Set(["normal", "tainted", "golden", "pigeon"]);
+const kinds = new Set(["tainted", "golden", "pigeon"]);
 
 function cleanText(value, max = 40) {
   return String(value || "").replace(/[^\w .,@!?'":()-]/g, "").trim().slice(0, max);

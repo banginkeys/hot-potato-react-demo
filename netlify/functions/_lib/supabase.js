@@ -355,11 +355,6 @@ export async function listIncomingSocialPotatoes(handle = "") {
     order: "created_at.asc",
     limit: "10"
   });
-  const normal = await fetchIncoming({
-    kind: "eq.normal",
-    order: "created_at.asc",
-    limit: "5"
-  });
 
-  return { configured: true, potatoes: [...special, ...normal] };
+  return { configured: true, potatoes: special };
 }

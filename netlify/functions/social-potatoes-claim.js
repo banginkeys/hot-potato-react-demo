@@ -21,10 +21,10 @@ export async function handler(event) {
     if (!id) return json(400, { error: "Missing social potato id." });
 
     const potato = await fetchSocialPotato(id);
-    if (!potato) return json(404, { error: "That Hot Potato link was not found." });
+    if (!potato) return json(404, { error: "That friend potato link was not found." });
     if (potato.claimed_at) {
       return json(409, {
-        error: "That Hot Potato was already claimed.",
+        error: "That friend potato was already claimed.",
         claimed: true,
         id: potato.id,
         kind: potato.kind
