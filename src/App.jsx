@@ -1910,14 +1910,14 @@ export default function App() {
     });
   }
 
-  function announceBabyHands() {
-    enqueueFx({ type: "baby", title: "YOU HAVE", subtitle: "", note: "", duration: 1200, sfx: "baby" });
+  function announceBabyHands({ combo = false } = {}) {
+    enqueueFx({ type: "baby", title: "YOU HAVE", subtitle: "", note: "", duration: combo ? 650 : 900, sfx: "baby" });
     enqueueFx({
       type: "baby",
       title: "BABY HANDS",
       subtitle: "Early passes cost 2x Tots for 5 rounds.",
       note: "Wait a few seconds before passing to dodge the penalty.",
-      duration: 5600,
+      duration: combo ? 1650 : 2600,
       soundGroup: "babyVoice",
       soundVolume: 0.95
     });
@@ -2333,8 +2333,9 @@ export default function App() {
       playSfx("pass");
       playSfx("win", Math.max(0.5, reward / 24));
       enqueueSpudWin(reward, golden ? "Golden Window bonus" : overdriveBonus ? "Overdrive boosted the pile" : "landed in the Spud Pile");
-      if (triggeredBabyHands) announceBabyHands();
-      if (pendingPower && streak % 5 === 0) announceHotStreak(streak, pendingPower);
+      const unlockedStreakPower = pendingPower && pendingPower !== old.pendingPower && streak % 5 === 0;
+      if (triggeredBabyHands) announceBabyHands({ combo: !!unlockedStreakPower });
+      if (unlockedStreakPower) announceHotStreak(streak, pendingPower);
       if (golden) {
         setFlightFx({ id: Date.now(), type: "golden", file: old.potato.file, assetPath: old.potato.assetPath || "" });
         enqueueFx({
@@ -4191,7 +4192,7 @@ function AttentionFx({ fx }) {
 
 function FullscreenFx({ fx }) {
   return (
-    <div className={`fullscreen-fx ${fx.type}`}>
+    <div className={`fullscreen-fx ${fx.type}`} style={{ "--fx-duration": `${fx.duration || 2400}ms` }}>
       <div className="fx-backdrop" />
       <div className="fx-words">
         {fx.gearKind && (
