@@ -869,10 +869,10 @@ small {
 }
 
 .potato-sprite.mitts-potato-sprite {
-  width: 144%;
-  height: 144%;
+  width: 132%;
+  height: 132%;
   overflow: visible;
-  transform: translateY(4%);
+  transform: translateY(1%);
 }
 
 .oven-mitts-held-sprite {
