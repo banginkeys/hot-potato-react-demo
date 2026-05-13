@@ -2826,6 +2826,7 @@ export default function App() {
             messageDraft={messageDraft}
             setMessageDraft={setMessageDraft}
             sendSocialPotato={sendSocialPotato}
+            onBadVideo={skipBadAd}
             setTarget={(target) => setGame((old) => ({ ...old, target: Number(target) || 0 }))}
             refreshPlayers={() => refreshPlayerDirectory(true)}
           />
@@ -3757,6 +3758,7 @@ function ActivityPanel({
   messageDraft,
   setMessageDraft,
   sendSocialPotato,
+  onBadVideo,
   setTarget,
   refreshPlayers
 }) {
@@ -3770,6 +3772,13 @@ function ActivityPanel({
         : "No friends yet";
   return (
     <aside className="panel activity-panel" ref={register("activity")}>
+      {game.sponsorBreak && (
+        <div className="side-sponsor-break">
+          <strong>Risky Sponsor Break</strong>
+          <SponsorBreakAd game={game} onBadVideo={onBadVideo} />
+          <span>Potato keeps cooking while the sponsor pays Tots.</span>
+        </div>
+      )}
       {game.unlocked.target && (
         <details className="target-drawer" open>
           <summary><span>Friends</span><strong>{selectedTarget ? playerDisplayName(selectedTarget) : playerStatusCopy}</strong></summary>

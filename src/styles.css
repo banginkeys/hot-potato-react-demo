@@ -903,6 +903,7 @@ small {
 .risk-ad {
   position: absolute;
   z-index: 8;
+  display: none;
   right: 1rem;
   top: 1rem;
   width: min(260px, 48%);
@@ -926,6 +927,46 @@ small {
   color: rgba(255, 255, 255, 0.8);
   font-size: 0.8rem;
   font-weight: 850;
+}
+
+.side-sponsor-break {
+  display: grid;
+  gap: 0.55rem;
+  margin-bottom: 0.85rem;
+  padding: 0.85rem;
+  border-radius: 22px;
+  color: #fff;
+  background:
+    radial-gradient(circle at 22% 16%, rgba(255, 226, 123, 0.28), transparent 34%),
+    linear-gradient(145deg, #28114f, #0c6f82 58%, #e28c2c);
+  border: 2px solid rgba(255, 255, 255, 0.55);
+  box-shadow: 0 16px 32px rgba(32, 12, 61, 0.22);
+}
+
+.side-sponsor-break strong {
+  color: #fff2a6;
+  font-size: 0.95rem;
+}
+
+.side-sponsor-break .ad-video-shell {
+  min-height: 126px;
+  border-radius: 16px;
+  background:
+    radial-gradient(circle at 24% 22%, rgba(255, 255, 255, 0.18), transparent 26%),
+    linear-gradient(135deg, #10111d, #251446 58%, #0d5161);
+}
+
+.side-sponsor-break video {
+  width: 100%;
+  display: block;
+  aspect-ratio: 16 / 9;
+  object-fit: contain;
+}
+
+.side-sponsor-break span {
+  color: rgba(255, 255, 255, 0.84);
+  font-size: 0.78rem;
+  font-weight: 900;
 }
 
 .details {
@@ -6629,6 +6670,7 @@ small {
   }
 
   .risk-ad {
+    display: grid;
     top: 62px;
     right: 7px;
     bottom: auto;
@@ -6649,6 +6691,10 @@ small {
   }
 
   .risk-ad span {
+    display: none;
+  }
+
+  .side-sponsor-break {
     display: none;
   }
 
