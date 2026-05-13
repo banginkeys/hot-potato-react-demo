@@ -2423,10 +2423,12 @@ export default function App() {
         }
         if ((p.equipment.hotSauceSquirts || 0) >= 3) return old;
         p.equipment.hotSauceSquirts = (p.equipment.hotSauceSquirts || 0) + 1;
+        p.equipment.hotSauceFx = Date.now();
         p.heat += 4;
         playSfx("heat", 1 + p.equipment.hotSauceSquirts * 0.2);
       } else if (key === "sourCream") {
         p.equipment.sourCreamTicks = 8;
+        p.equipment.sourCreamFx = Date.now();
         p.heat = Math.max(0, p.heat - 12);
         p.fuse += 6;
         playSfx("snooze");
@@ -2439,6 +2441,7 @@ export default function App() {
         playSfx("chest");
       } else if (key === "thermometer") {
         p.equipment.thermometer = true;
+        p.equipment.thermometerFx = Date.now();
         playSfx("tap");
       }
       return addLog({ ...markGuidesSeen(old, "equipment"), potato: p, equipment: inv }, `${equipment[key].name} used on this potato.`, "info");
@@ -3005,7 +3008,7 @@ function PotatoStage({ game, heatScore, coins, babyCry, overdriveBoost, onBadVid
           <StageFire heatScore={heatScore} holding={game.holding} />
           <div className="potato-anchor">
             <div
-              className={`potato-wrap ${landing ? `throw-in-${p.throwSide || "left"}` : ""} ${game.holding ? "holding" : ""} ${heatScore > 0.45 ? "hot" : ""} ${steam ? "steaming" : ""} ${smoke ? "smoking" : ""} ${burning ? "burning" : ""} ${gear.sourCreamTicks > 0 ? "sour-cream-active" : ""} ${gear.hotSauceSquirts ? "hot-sauce-active" : ""} ${gear.foilWrap ? "foil-wrapped" : ""} ${gear.ovenMitts ? "mitts-on" : ""}`}
+              className={`potato-wrap ${landing ? `throw-in-${p.throwSide || "left"}` : ""} ${game.holding ? "holding" : ""} ${heatScore > 0.45 ? "hot" : ""} ${steam ? "steaming" : ""} ${smoke ? "smoking" : ""} ${burning ? "burning" : ""} ${gear.sourCreamTicks > 0 ? "sour-cream-active" : ""} ${gear.hotSauceSquirts ? "hot-sauce-active" : ""} ${gear.thermometer ? "thermometer-active" : ""} ${gear.foilWrap ? "foil-wrapped" : ""} ${gear.ovenMitts ? "mitts-on" : ""}`}
               style={{
                 "--steam-intensity": clamp((p.age - 5) / 24, 0, 1),
                 "--smoke-intensity": clamp((p.age - 24) / 40, 0, 1),
@@ -3015,7 +3018,7 @@ function PotatoStage({ game, heatScore, coins, babyCry, overdriveBoost, onBadVid
               <div className="heat-halo" />
               {game.holding && <VisualShepard />}
               <HeatWisps />
-              <EquipmentFx />
+              <EquipmentFx gear={gear} />
               <div className={`potato-sprite ${pigeonPotato ? "pigeon-potato-sprite" : ""}`}>
                 {pigeonPotato ? (
                   <PigeonPotatoSprite alt="Pigeon Potato" />
@@ -3109,12 +3112,23 @@ function EquipmentStatus({ gear }) {
   );
 }
 
-function EquipmentFx() {
+function EquipmentFx({ gear = {} }) {
   return (
     <>
       <div className="equipment-fx mitts-fx" aria-hidden="true">
         <span className="oven-mitt left"><i /><b /></span>
         <span className="oven-mitt right"><i /><b /></span>
+      </div>
+      <div key={`sauce-${gear.hotSauceFx || gear.hotSauceSquirts || 0}`} className="equipment-tool-fx hot-sauce-tool-fx" aria-hidden="true">
+        <img src={assetUrl("Equipment", "hot-sauce-bottle.svg")} alt="" />
+        <span />
+      </div>
+      <div key={`cream-${gear.sourCreamFx || gear.sourCreamTicks || 0}`} className="equipment-tool-fx sour-cream-tool-fx" aria-hidden="true">
+        <img src={assetUrl("Equipment", "sour-cream-tub.svg")} alt="" />
+        <span />
+      </div>
+      <div key={`thermo-${gear.thermometerFx || Number(!!gear.thermometer)}`} className="equipment-tool-fx thermometer-tool-fx" aria-hidden="true">
+        <img src={assetUrl("Equipment", "thermometer.svg")} alt="" />
       </div>
       <div className="equipment-fx sour-cream-fx" aria-hidden="true" />
       <div className="equipment-fx hot-sauce-fx" aria-hidden="true" />

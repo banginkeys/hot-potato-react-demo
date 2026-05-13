@@ -1,0 +1,78 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 220 220" role="img" aria-labelledby="title desc">
+  <title id="title">Chunky potato thermometer</title>
+  <desc id="desc">A playful game-style thermometer shaped like a little potato, with a hot red bulb and goofy face.</desc>
+  <defs>
+    <linearGradient id="potatoSkin" x1="50" y1="22" x2="166" y2="190" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#ffd97b"/>
+      <stop offset="0.5" stop-color="#d99b45"/>
+      <stop offset="1" stop-color="#9c632c"/>
+    </linearGradient>
+    <linearGradient id="glassTube" x1="88" y1="31" x2="140" y2="161" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#fff9e7"/>
+      <stop offset="0.58" stop-color="#f4f8ff"/>
+      <stop offset="1" stop-color="#bcd9f3"/>
+    </linearGradient>
+    <linearGradient id="mercury" x1="105" y1="72" x2="136" y2="179" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#ffec52"/>
+      <stop offset="0.45" stop-color="#ff7c24"/>
+      <stop offset="1" stop-color="#e31520"/>
+    </linearGradient>
+    <filter id="softShadow" x="-20%" y="-20%" width="140%" height="150%">
+      <feDropShadow dx="0" dy="8" stdDeviation="5" flood-color="#47260d" flood-opacity="0.28"/>
+    </filter>
+    <filter id="tinyGlow" x="-45%" y="-45%" width="190%" height="190%">
+      <feGaussianBlur stdDeviation="3" result="blur"/>
+      <feColorMatrix in="blur" type="matrix" values="1 0 0 0 1  0 0.45 0 0 0.28  0 0 0.1 0 0  0 0 0 0.55 0"/>
+      <feMerge>
+        <feMergeNode/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+  </defs>
+
+  <g filter="url(#softShadow)">
+    <path d="M66 22c24-17 65-9 91 18 24 25 39 67 30 101-10 39-47 65-84 60-36-4-67-39-72-78-5-40 10-84 35-101z" fill="#603719" opacity="0.24"/>
+    <path d="M61 18c25-16 67-8 95 20 25 26 39 69 29 105-11 40-49 67-88 62-37-5-69-40-75-80-5-41 12-90 39-107z" fill="url(#potatoSkin)" stroke="#5b3518" stroke-width="8" stroke-linejoin="round"/>
+    <path d="M70 31c23-12 56-5 79 17 20 19 33 50 31 77-3 31-32 59-64 64-31 5-62-15-76-47 17 24 48 33 75 23 35-14 49-52 38-84-10-30-41-55-83-50z" fill="#fff1ab" opacity="0.26"/>
+    <path d="M153 54c15 19 23 47 18 72-5 28-27 51-54 57 20-13 35-34 39-59 4-26 0-50-3-70z" fill="#7d431d" opacity="0.2"/>
+
+    <g fill="#7b4720" opacity="0.68">
+      <ellipse cx="53" cy="78" rx="8" ry="5" transform="rotate(-24 53 78)"/>
+      <ellipse cx="73" cy="42" rx="6" ry="4" transform="rotate(19 73 42)"/>
+      <ellipse cx="161" cy="93" rx="8" ry="5" transform="rotate(28 161 93)"/>
+      <ellipse cx="69" cy="153" rx="7" ry="5" transform="rotate(33 69 153)"/>
+      <ellipse cx="139" cy="168" rx="6" ry="4" transform="rotate(-18 139 168)"/>
+      <ellipse cx="112" cy="36" rx="5" ry="3" transform="rotate(-11 112 36)"/>
+    </g>
+
+    <g>
+      <path d="M119 32c18 0 33 14 33 32v79a47 47 0 1 1-66 0V64c0-18 15-32 33-32z" fill="#542d16" opacity="0.28"/>
+      <path d="M117 25c16 0 29 13 29 29v81a44 44 0 1 1-58 0V54c0-16 13-29 29-29z" fill="#fff5cf" stroke="#513018" stroke-width="7" stroke-linejoin="round"/>
+      <path d="M117 35c10 0 19 8 19 19v88l3 3a31 31 0 1 1-44 0l3-3V54c0-11 9-19 19-19z" fill="url(#glassTube)" stroke="#6c4b2e" stroke-width="4" stroke-linejoin="round"/>
+      <path d="M111 58h12v92c11 3 19 13 19 25 0 15-11 26-25 26s-25-11-25-26c0-12 8-22 19-25V58z" fill="url(#mercury)" filter="url(#tinyGlow)"/>
+      <path d="M111 58h12v38h-12z" fill="#ffdf3f"/>
+      <circle cx="117" cy="176" r="19" fill="#f72528"/>
+      <path d="M102 164c6-8 19-11 30-3-14-3-25 1-30 13z" fill="#fff0a1" opacity="0.55"/>
+      <path d="M107 47c3-5 10-8 17-5" fill="none" stroke="#ffffff" stroke-width="5" stroke-linecap="round" opacity="0.9"/>
+      <path d="M132 65h18M132 88h13M132 111h18M132 134h13" fill="none" stroke="#513018" stroke-width="5" stroke-linecap="round"/>
+    </g>
+
+    <g transform="translate(0 3)">
+      <path d="M70 118c6 8 16 12 27 12 10 0 20-4 27-12" fill="none" stroke="#4f2d16" stroke-width="6" stroke-linecap="round"/>
+      <circle cx="69" cy="94" r="11" fill="#4f2d16"/>
+      <circle cx="129" cy="94" r="11" fill="#4f2d16"/>
+      <circle cx="73" cy="90" r="4" fill="#ffffff"/>
+      <circle cx="133" cy="90" r="4" fill="#ffffff"/>
+      <path d="M87 105c5 4 13 4 18 0" fill="none" stroke="#4f2d16" stroke-width="5" stroke-linecap="round"/>
+      <path d="M50 102c-10-6-18-4-23 5M151 102c9-7 18-5 23 5" fill="none" stroke="#5b3518" stroke-width="7" stroke-linecap="round"/>
+      <path d="M48 102c-8-5-14-3-18 3M153 102c7-5 13-3 17 3" fill="none" stroke="#f6bf61" stroke-width="3" stroke-linecap="round" opacity="0.9"/>
+    </g>
+
+    <g>
+      <path d="M169 50l8-15 8 15 15 8-15 8-8 15-8-15-15-8z" fill="#fff178" stroke="#6c3a16" stroke-width="5" stroke-linejoin="round"/>
+      <path d="M40 54l5-9 5 9 9 5-9 5-5 9-5-9-9-5z" fill="#ffffff" stroke="#6c3a16" stroke-width="4" stroke-linejoin="round"/>
+      <path d="M178 122c7 4 13 12 14 22" fill="none" stroke="#ffdf3f" stroke-width="7" stroke-linecap="round"/>
+      <path d="M181 122c5 4 9 10 10 18" fill="none" stroke="#ff5a25" stroke-width="3" stroke-linecap="round"/>
+    </g>
+  </g>
+</svg>

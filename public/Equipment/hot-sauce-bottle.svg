@@ -1,0 +1,58 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 220 320" role="img" aria-labelledby="title desc">
+  <title id="title">Hot sauce bottle</title>
+  <desc id="desc">A playful red hot sauce bottle with a smiling flame label and comic game-style highlights.</desc>
+  <defs>
+    <linearGradient id="sauceGlass" x1="56" y1="66" x2="172" y2="288" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#ff5f35"/>
+      <stop offset=".42" stop-color="#f52b1d"/>
+      <stop offset="1" stop-color="#9c0f16"/>
+    </linearGradient>
+    <linearGradient id="neckGlass" x1="80" y1="32" x2="139" y2="109" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#ff8a43"/>
+      <stop offset="1" stop-color="#d7191f"/>
+    </linearGradient>
+    <linearGradient id="capGradient" x1="72" y1="14" x2="146" y2="55" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#ffd84d"/>
+      <stop offset=".48" stop-color="#ffab17"/>
+      <stop offset="1" stop-color="#df6d00"/>
+    </linearGradient>
+    <linearGradient id="labelGradient" x1="46" y1="123" x2="174" y2="231" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#fff6a8"/>
+      <stop offset=".58" stop-color="#ffd44c"/>
+      <stop offset="1" stop-color="#ff9824"/>
+    </linearGradient>
+    <filter id="softShadow" x="-30%" y="-20%" width="160%" height="150%" color-interpolation-filters="sRGB">
+      <feDropShadow dx="0" dy="12" stdDeviation="8" flood-color="#4a0810" flood-opacity=".34"/>
+    </filter>
+  </defs>
+
+  <g filter="url(#softShadow)">
+    <path d="M77 64c0-8 6-14 14-14h38c8 0 14 6 14 14v41c0 10 5 19 13 25 18 13 30 35 30 60v58c0 32-26 58-58 58H92c-32 0-58-26-58-58v-58c0-25 12-47 30-60 8-6 13-15 13-25V64Z" fill="#5f1315"/>
+    <path d="M83 65c0-5 4-10 10-10h34c6 0 10 5 10 10v40c0 13 7 26 18 34 16 11 25 29 25 51v56c0 29-23 52-52 52H92c-29 0-52-23-52-52v-56c0-22 9-40 25-51 11-8 18-21 18-34V65Z" fill="url(#sauceGlass)"/>
+    <path d="M83 65c0-5 4-10 10-10h34c6 0 10 5 10 10v43H83V65Z" fill="url(#neckGlass)"/>
+    <path d="M73 31c0-10 8-18 18-18h38c10 0 18 8 18 18v20c0 6-5 11-11 11H84c-6 0-11-5-11-11V31Z" fill="#68200b"/>
+    <path d="M78 29c0-7 6-12 13-12h38c7 0 13 5 13 12v18c0 5-4 9-9 9H87c-5 0-9-4-9-9V29Z" fill="url(#capGradient)"/>
+    <path d="M86 23h8v30h-8V23Zm17 0h8v30h-8V23Zm17 0h8v30h-8V23Zm17 7v16c0 3-2 5-5 5h-3V24h2c3 0 6 3 6 6Z" fill="#f17600" opacity=".62"/>
+
+    <path d="M68 133c19-12 65-16 91 0 12 8 12 76 0 84-25 17-73 13-91 0-12-9-12-76 0-84Z" fill="#7e120f" opacity=".5"/>
+    <path d="M64 125c20-13 70-17 98 0 13 8 13 80 0 89-27 18-78 14-98 0-13-9-13-80 0-89Z" fill="url(#labelGradient)" stroke="#6e170b" stroke-width="7" stroke-linejoin="round"/>
+    <path d="M74 137c18-7 54-9 75 0" fill="none" stroke="#fff8ca" stroke-width="7" stroke-linecap="round" opacity=".78"/>
+
+    <path d="M112 142c10 14 33 28 25 54-5 17-19 27-38 25-18-2-31-16-31-33 0-15 10-25 21-34-1 10 2 16 8 19 1-15 6-25 15-31Z" fill="#df1717" stroke="#6e170b" stroke-width="5" stroke-linejoin="round"/>
+    <path d="M109 165c6 8 18 16 14 30-3 9-11 15-22 14-10-1-18-9-18-18 0-8 6-14 12-19 0 6 1 10 5 12 1-9 4-15 9-19Z" fill="#ffef57"/>
+    <path d="M91 190c4 5 11 7 18 7s14-3 18-8" fill="none" stroke="#641111" stroke-width="5" stroke-linecap="round"/>
+    <circle cx="94" cy="181" r="4" fill="#43100d"/>
+    <circle cx="120" cy="181" r="4" fill="#43100d"/>
+
+    <path d="M78 230c17 10 49 13 70 1" fill="none" stroke="#ffcc2b" stroke-width="8" stroke-linecap="round"/>
+    <path d="M76 247c18 7 49 8 69 0" fill="none" stroke="#ff7f1e" stroke-width="6" stroke-linecap="round"/>
+    <path d="M69 103c-12 6-20 19-24 34" fill="none" stroke="#ffb58b" stroke-width="9" stroke-linecap="round" opacity=".42"/>
+    <path d="M62 160c-7 19-7 52-1 75" fill="none" stroke="#ffd1bd" stroke-width="8" stroke-linecap="round" opacity=".45"/>
+    <path d="M139 71c11 12 15 33 14 47" fill="none" stroke="#ff9f71" stroke-width="7" stroke-linecap="round" opacity=".35"/>
+    <path d="M150 155c8 20 9 55 2 81" fill="none" stroke="#7b0710" stroke-width="8" stroke-linecap="round" opacity=".24"/>
+  </g>
+
+  <path d="M31 79c-9-11-7-25 5-32-1 12 5 18 16 23-12 1-18 4-21 9Z" fill="#ffcf33" stroke="#7a160b" stroke-width="5" stroke-linejoin="round"/>
+  <path d="M180 89c14-3 25 5 27 19-10-7-18-6-29 0 6-8 7-14 2-19Z" fill="#ffcf33" stroke="#7a160b" stroke-width="5" stroke-linejoin="round"/>
+  <path d="M175 274c15 3 22 14 18 28-7-10-14-13-27-11 9-5 11-10 9-17Z" fill="#ffcf33" stroke="#7a160b" stroke-width="5" stroke-linejoin="round"/>
+</svg>
