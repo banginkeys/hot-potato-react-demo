@@ -3027,7 +3027,6 @@ function PotatoStage({ game, heatScore, coins, babyCry, overdriveBoost, onBadVid
                 )}
               </div>
               {p.equipment.foilWrap && <div className="gear-badge">Foil</div>}
-              {p.equipment.ovenMitts && <div className="gear-badge mitts">Mitts</div>}
               {p.equipment.thermometer && <div className="gear-badge thermo">{fmt(p.pool)} SPUD</div>}
             </div>
           </div>
@@ -3113,7 +3112,10 @@ function EquipmentStatus({ gear }) {
 function EquipmentFx() {
   return (
     <>
-      <div className="equipment-fx mitts-fx" aria-hidden="true" />
+      <div className="equipment-fx mitts-fx" aria-hidden="true">
+        <span className="oven-mitt left"><i /><b /></span>
+        <span className="oven-mitt right"><i /><b /></span>
+      </div>
       <div className="equipment-fx sour-cream-fx" aria-hidden="true" />
       <div className="equipment-fx hot-sauce-fx" aria-hidden="true" />
       <div className="equipment-fx foil-wrap-fx" aria-hidden="true" />

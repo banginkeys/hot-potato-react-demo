@@ -758,12 +758,6 @@ small {
   box-shadow: 0 6px 14px rgba(69, 38, 0, 0.16);
 }
 
-.gear-badge.mitts {
-  top: 33%;
-  background: #b5f2ff;
-  color: #075466;
-}
-
 .gear-badge.thermo {
   right: 5%;
   left: auto;
@@ -1176,22 +1170,28 @@ small {
 
 .gear-icon-mitts::before,
 .gear-icon-mitts::after {
-  width: 14px;
-  height: 20px;
-  border-radius: 9px 9px 7px 7px;
-  background: linear-gradient(180deg, #ff7366, #bd2218);
+  width: 17px;
+  height: 23px;
+  border-radius: 13px 13px 8px 8px;
+  background:
+    radial-gradient(ellipse at 28% 49%, #ff8b69 0 21%, transparent 22%),
+    linear-gradient(180deg, transparent 0 70%, #8f201a 71% 100%),
+    linear-gradient(180deg, #ff7457, #c22b22);
+  border: 2px solid rgba(112, 29, 19, 0.32);
+  box-shadow: inset 0 3px 0 rgba(255, 230, 185, 0.44);
+  clip-path: polygon(28% 0, 76% 0, 94% 19%, 91% 58%, 78% 74%, 76% 100%, 22% 100%, 18% 74%, 2% 57%, 4% 35%, 20% 36%);
 }
 
 .gear-icon-mitts::before {
-  left: 7px;
-  top: 9px;
-  transform: rotate(-18deg);
+  left: 4px;
+  top: 8px;
+  transform: rotate(-16deg);
 }
 
 .gear-icon-mitts::after {
-  right: 7px;
-  top: 9px;
-  transform: rotate(18deg);
+  right: 4px;
+  top: 8px;
+  transform: scaleX(-1) rotate(-16deg);
 }
 
 .gear-icon-cream::before {
@@ -4039,31 +4039,93 @@ small {
 }
 
 .mitts-fx {
-  inset: 0;
+  inset: -1% -14% -4%;
+  z-index: 7;
+  filter: drop-shadow(0 12px 10px rgba(63, 21, 0, 0.2));
 }
 
-.mitts-fx::before,
-.mitts-fx::after {
+.oven-mitt {
+  position: absolute;
+  top: 41%;
+  width: 82px;
+  height: 102px;
+  transform-origin: 50% 86%;
+  animation: mittReady 1.55s ease-in-out infinite;
+}
+
+.oven-mitt.left {
+  left: 1%;
+  transform: rotate(-19deg);
+}
+
+.oven-mitt.right {
+  right: 1%;
+  transform: scaleX(-1) rotate(-19deg);
+  animation-delay: -0.34s;
+}
+
+.oven-mitt::before,
+.oven-mitt::after,
+.oven-mitt i,
+.oven-mitt b {
   content: "";
   position: absolute;
-  top: 48%;
-  width: 50px;
-  height: 64px;
-  border-radius: 28px 28px 22px 22px;
+  display: block;
+}
+
+.oven-mitt i {
+  z-index: 1;
+  left: 4px;
+  top: 37px;
+  width: 34px;
+  height: 45px;
+  border: 3px solid rgba(114, 29, 20, 0.34);
+  border-radius: 23px 12px 16px 22px;
   background:
-    radial-gradient(circle at 50% 21%, rgba(255, 235, 180, 0.72), transparent 24%),
-    linear-gradient(180deg, #ff875d, #bd2f23);
-  box-shadow: inset 0 -7px 0 rgba(90, 18, 12, 0.18), 0 10px 18px rgba(67, 22, 0, 0.18);
+    radial-gradient(circle at 38% 23%, rgba(255, 223, 169, 0.62), transparent 25%),
+    linear-gradient(180deg, #ff8a65, #c73429);
+  transform: rotate(-36deg);
+  box-shadow: inset -4px -5px 0 rgba(104, 18, 12, 0.14);
 }
 
-.mitts-fx::before {
-  left: -4px;
-  transform: rotate(-18deg);
+.oven-mitt::before {
+  z-index: 2;
+  left: 25px;
+  top: 4px;
+  width: 47px;
+  height: 78px;
+  border: 3px solid rgba(114, 29, 20, 0.34);
+  border-radius: 30px 29px 20px 18px / 34px 35px 22px 24px;
+  background:
+    radial-gradient(circle at 37% 17%, rgba(255, 233, 177, 0.74), transparent 22%),
+    repeating-linear-gradient(90deg, rgba(255, 255, 255, 0.13) 0 5px, transparent 6px 13px),
+    linear-gradient(180deg, #ff7958, #d83b2d 64%, #b22a24);
+  box-shadow: inset -6px -8px 0 rgba(96, 17, 12, 0.14), inset 4px 5px 0 rgba(255, 224, 178, 0.16);
 }
 
-.mitts-fx::after {
-  right: -4px;
-  transform: rotate(18deg);
+.oven-mitt::after {
+  z-index: 3;
+  left: 24px;
+  bottom: 3px;
+  width: 51px;
+  height: 25px;
+  border: 3px solid rgba(87, 24, 16, 0.36);
+  border-radius: 9px 9px 13px 13px;
+  background:
+    repeating-linear-gradient(90deg, rgba(255, 238, 190, 0.58) 0 5px, transparent 5px 10px),
+    linear-gradient(180deg, #8f241f, #5e1818);
+  box-shadow: inset 0 3px 0 rgba(255, 221, 174, 0.23);
+}
+
+.oven-mitt b {
+  z-index: 4;
+  left: 41px;
+  top: 19px;
+  width: 22px;
+  height: 40px;
+  border-left: 3px dashed rgba(102, 25, 18, 0.36);
+  border-radius: 50%;
+  transform: rotate(9deg);
 }
 
 .potato-wrap.sour-cream-active .sour-cream-fx {
@@ -4080,7 +4142,7 @@ small {
 }
 
 .potato-wrap.mitts-on .mitts-fx {
-  opacity: 0.92;
+  opacity: 1;
 }
 
 @keyframes creamSplat {
@@ -4096,6 +4158,11 @@ small {
 
 @keyframes foilShimmer {
   to { background-position: 34px 0, 28px 0; }
+}
+
+@keyframes mittReady {
+  0%, 100% { translate: 0 0; }
+  50% { translate: 0 -4px; }
 }
 
 .equipment-status {
