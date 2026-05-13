@@ -3015,12 +3015,19 @@ function WalletPanel({
             onClick={moveToPile}
             disabled={!canMoveToPile}
             aria-disabled={!canMoveToPile}
-            title={game.sac > 0 ? "Moves SPUD from the Spud Sac." : `Converts ${SPUD.riskFundTots} Tots into SPUD first.`}
+            title={game.sac > 0 ? "Risk: moves safe SPUD from the Spud Sac into the exposed Spud Pile." : `Risk: converts ${SPUD.riskFundTots} Tots into exposed SPUD first.`}
           >
-            Move {fmt(moveToPileAmount)} SPUD to Pile
+            Risk: Move {fmt(moveToPileAmount)} SPUD to Pile
           </button>
-          <button ref={register("moveSac")} className={`green ${canMoveToSac ? "" : "visually-disabled"}`} onClick={moveToSac} disabled={!canMoveToSac} aria-disabled={!canMoveToSac}>
-            Move {fmt(moveToSacAmount)} SPUD to Sac
+          <button
+            ref={register("moveSac")}
+            className={`green ${canMoveToSac ? "" : "visually-disabled"}`}
+            onClick={moveToSac}
+            disabled={!canMoveToSac}
+            aria-disabled={!canMoveToSac}
+            title="Safe: moves exposed SPUD from the Spud Pile into the protected Spud Sac."
+          >
+            Safe: Move {fmt(moveToSacAmount)} SPUD to Sac
           </button>
         </div>
       )}
