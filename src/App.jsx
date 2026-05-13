@@ -4169,7 +4169,46 @@ function OnboardingModal({ game, setGame, completeOnboarding, restoreProfile }) 
             <button className="green" onClick={() => completeOnboarding(true)}>Yes, Show Me Around</button>
             <button className="ghost" onClick={() => completeOnboarding(false)}>No Tour, Let Me Play</button>
           </div>
-          <button className="text-link" type="button" onClick={() => setStep("profile")}>Back to avatar</button>
+          <button className="text-link" type="button" onClick={() => setStep("recipe")}>Back to Secret Recipe</button>
+        </div>
+      </div>
+    );
+  }
+
+  if (step === "recipe") {
+    return (
+      <div className="modal show">
+        <div className="modal-card onboarding-card recipe-step-card">
+          <div className="onboarding-step-head">
+            <small>Step 2 of 2</small>
+            <h2>Choose Your Secret Recipe</h2>
+            <p className="onboarding-note">Pick three pictures in order. This is your simple recovery code if cookies get cleared.</p>
+          </div>
+          <div className="onboarding-preview compact-preview">
+            <div className="avatar large"><img src={assetUrl("Avatars", avatar.file)} alt="" /></div>
+            <div><strong>{game.playerName || "Your Name"}</strong><span>{avatar.name} style</span></div>
+          </div>
+          <div className="recipe-card recipe-step">
+            <small>Your Secret Recipe</small>
+            <SecretRecipeSummary value={profileCode} />
+            <strong>{secretRecipeNames(profileCode)}</strong>
+            <SecretRecipePicker
+              value={profileCode}
+              onChange={(nextSlots) => setGame((old) => ({ ...old, profileCode: cleanSecretRecipe(nextSlots) }))}
+              compact
+            />
+            <button
+              className="ghost mini-action"
+              type="button"
+              onClick={() => setGame((old) => ({ ...old, profileCode: makeSecretRecipe() }))}
+            >
+              Random Recipe
+            </button>
+          </div>
+          <div className="onboarding-actions split-actions">
+            <button className="ghost" onClick={() => setStep("profile")}>Back</button>
+            <button className="green" onClick={() => setStep("tour")} disabled={!secretRecipeComplete(profileCode)}>Save Player</button>
+          </div>
         </div>
       </div>
     );
@@ -4177,12 +4216,11 @@ function OnboardingModal({ game, setGame, completeOnboarding, restoreProfile }) 
 
   return (
     <div className="modal show">
-      <div className="modal-card onboarding-card">
-        <h2>Choose Your Player</h2>
-        <div className="onboarding-rules">
-          <span><strong>1</strong> Earn Tots from sponsors.</span>
-          <span><strong>2</strong> Move SPUD into the Spud Pile.</span>
-          <span><strong>3</strong> Pass before it blows.</span>
+      <div className="modal-card onboarding-card profile-step-card">
+        <div className="onboarding-step-head">
+          <small>Step 1 of 2</small>
+          <h2>Choose Your Player</h2>
+          <p className="onboarding-note">Pick a username and avatar. The Secret Recipe comes next.</p>
         </div>
         <div className="onboarding-preview">
           <div className="avatar large"><img src={assetUrl("Avatars", avatar.file)} alt="" /></div>
@@ -4197,22 +4235,6 @@ function OnboardingModal({ game, setGame, completeOnboarding, restoreProfile }) 
             onChange={(e) => setGame((old) => ({ ...old, playerName: cleanUsername(e.target.value) }))}
           />
         </label>
-        <div className="recipe-card">
-          <small>Your Secret Recipe</small>
-          <SecretRecipeSummary value={profileCode} />
-          <span>Pick three pictures in order. This lets you recover this test player after clearing cookies.</span>
-          <SecretRecipePicker
-            value={profileCode}
-            onChange={(nextSlots) => setGame((old) => ({ ...old, profileCode: cleanSecretRecipe(nextSlots) }))}
-          />
-          <button
-            className="ghost mini-action"
-            type="button"
-            onClick={() => setGame((old) => ({ ...old, profileCode: makeSecretRecipe() }))}
-          >
-            Random Recipe
-          </button>
-        </div>
         <div className="avatar-picker">
           {avatars.map((item) => (
             <button key={item.id} className={item.id === game.avatar ? "selected" : ""} onClick={() => setGame((old) => ({ ...old, avatar: item.id }))}>
@@ -4221,8 +4243,10 @@ function OnboardingModal({ game, setGame, completeOnboarding, restoreProfile }) 
             </button>
           ))}
         </div>
-        <button className="green" onClick={() => setStep("tour")} disabled={!validUsername(game.playerName)}>Save Player</button>
-        <button className="ghost" onClick={() => setMode("login")}>I Already Have a Player</button>
+        <div className="onboarding-actions split-actions">
+          <button className="ghost" onClick={() => setMode("login")}>I Already Have a Player</button>
+          <button className="green" onClick={() => setStep("recipe")} disabled={!validUsername(game.playerName)}>Next: Secret Recipe</button>
+        </div>
       </div>
     </div>
   );
