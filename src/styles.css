@@ -650,6 +650,19 @@ small {
   background: transparent;
 }
 
+.empty-stage.needs-pile,
+.empty-stage.needs-tots,
+.empty-stage.paused {
+  max-width: min(560px, 92%);
+  padding: 1.05rem 1.1rem;
+  border: 2px solid rgba(68, 38, 99, 0.1);
+  border-radius: 28px;
+  background:
+    radial-gradient(circle at 80% 14%, rgba(255, 255, 255, 0.76), transparent 4.5rem),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.82), rgba(255, 248, 234, 0.72));
+  box-shadow: 0 16px 32px rgba(50, 26, 72, 0.12);
+}
+
 .empty-stage .big {
   width: 96px;
   aspect-ratio: 1;
@@ -663,9 +676,60 @@ small {
   transform: rotate(-7deg);
 }
 
+.empty-stage.needs-pile .big {
+  color: #fff9c8;
+  background:
+    radial-gradient(circle at 34% 28%, rgba(255, 255, 255, 0.72), transparent 22%),
+    linear-gradient(145deg, #ff4b34, #e13753 54%, #7b2fc9);
+  box-shadow: 0 0 0 6px rgba(255, 75, 52, 0.16), 0 18px 26px rgba(122, 47, 201, 0.18);
+  animation: emptyUrgentPulse 680ms ease-in-out infinite alternate;
+}
+
+.empty-stage.needs-tots .big {
+  color: #2a4960;
+  background: linear-gradient(145deg, #9df4ff, #48c8f0 58%, #ffe178);
+}
+
+.empty-stage.paused .big {
+  color: #fff;
+  background: linear-gradient(145deg, #8e82ff, #2b1b69);
+}
+
 .empty-stage p {
   color: #745f80;
   font-weight: 800;
+}
+
+.empty-stage-cta {
+  min-height: 48px;
+  padding: 0.7rem 1rem;
+  border-radius: 16px;
+  color: #fff;
+  background: linear-gradient(180deg, #ff826f, #ff4431 62%, #b82622);
+  box-shadow: 0 6px 0 rgba(139, 34, 26, 0.34), 0 14px 24px rgba(255, 68, 49, 0.18);
+}
+
+.empty-stage.needs-tots .empty-stage-cta {
+  color: #2e2440;
+  background: linear-gradient(180deg, #85f1ff, #32c4ed 62%, #18a9d5);
+  box-shadow: 0 6px 0 rgba(22, 128, 159, 0.32), 0 14px 24px rgba(50, 196, 237, 0.18);
+}
+
+.empty-stage-meta {
+  display: inline-grid;
+  place-items: center;
+  min-height: 28px;
+  padding: 0.26rem 0.58rem;
+  border-radius: 999px;
+  color: #5d4a6b;
+  background: rgba(255, 255, 255, 0.68);
+  font-size: 0.78rem;
+  font-weight: 1000;
+}
+
+@keyframes emptyUrgentPulse {
+  from { transform: rotate(-7deg) scale(1); filter: saturate(1); }
+  to { transform: rotate(-3deg) scale(1.04); filter: saturate(1.22); }
 }
 
 .potato-anchor {

@@ -802,6 +802,69 @@ function autoDeliveryPaused(game) {
   return !!guide && guide[0] !== "waitPotato";
 }
 
+function emptyStageInfo(game) {
+  if (!game.connected) {
+    return {
+      tone: "connect",
+      icon: "HP",
+      title: "Connect to start",
+      body: "Choose a player, connect, earn Tots, then play."
+    };
+  }
+  if (deliveryProtectionActive(game)) {
+    const protection = protectionInfo(game);
+    return {
+      tone: "paused",
+      icon: "Zz",
+      title: `${protection.status}: potatoes paused`,
+      body: "Hot Potatoes will not arrive until your protection window is open.",
+      meta: protection.note
+    };
+  }
+  if (game.risk <= 0 && game.sac > 0) {
+    const amount = Math.min(SPUD.moveChunkSpud || SPUD.riskFundSpud, game.sac);
+    return {
+      tone: "needs-pile",
+      icon: "!",
+      title: "Spud Pile empty",
+      body: "Your SPUD is safe in the Spud Sac. Move some into the Spud Pile so Hot Potatoes can arrive.",
+      action: "moveToPile",
+      actionLabel: `Risk: Move ${fmt(amount)} SPUD to Pile`,
+      meta: "No Spud Pile, no potatoes."
+    };
+  }
+  if (game.risk <= 0 && game.tots >= SPUD.riskFundTots) {
+    return {
+      tone: "needs-pile",
+      icon: "!",
+      title: "Build your Spud Pile",
+      body: `Convert ${SPUD.riskFundTots} Tots into exposed SPUD first. Potatoes only arrive when SPUD is at risk.`,
+      action: "moveToPile",
+      actionLabel: `Risk: Move ${SPUD.riskFundSpud} SPUD to Pile`,
+      meta: "The Spud Sac stays safe."
+    };
+  }
+  if (game.risk <= 0) {
+    const payout = rewardedAdPayout(game.ads);
+    return {
+      tone: "needs-tots",
+      icon: "HP",
+      title: "Need Tots first",
+      body: "Watch an ad to earn pass fuel, then build your Spud Pile before potatoes can arrive.",
+      action: "watchAd",
+      actionLabel: `Watch Ad +${payout.tots} Tots`,
+      meta: "Tots are free gameplay fuel."
+    };
+  }
+  return {
+    tone: "waiting",
+    icon: "HP",
+    title: "Hands empty",
+    body: "A Hot Potato is looking for you. Stay ready.",
+    meta: "Your Spud Pile is funded."
+  };
+}
+
 function socialDeliveryAt(game, now = Date.now()) {
   if (!game.pendingSocialPotato || !game.connected || game.risk <= 0 || game.potato || deliveryProtectionActive(game)) return game.nextAt || 0;
   const soon = now + SOCIAL_DELIVERY_DELAY_MS;
@@ -2792,6 +2855,8 @@ export default function App() {
             babyCry={babyCry}
             overdriveBoost={overdriveBoost}
             onBadVideo={skipBadAd}
+            moveToPile={moveToPile}
+            setAdModal={setAdModal}
           />
           <GameControls
             game={game}
@@ -3204,7 +3269,7 @@ function ScoreBar({ game, avatar }) {
   );
 }
 
-function PotatoStage({ game, heatScore, coins, babyCry, overdriveBoost, onBadVideo }) {
+function PotatoStage({ game, heatScore, coins, babyCry, overdriveBoost, onBadVideo, moveToPile, setAdModal }) {
   const p = game.potato;
   const [landing, setLanding] = useState(false);
   const steam = p && p.age > 5;
@@ -3219,6 +3284,12 @@ function PotatoStage({ game, heatScore, coins, babyCry, overdriveBoost, onBadVid
   const sizzlePercent = sizzleMeterPercent(p, game.holding);
   const potatoImage = p?.assetPath ? assetUrl(p.assetPath) : p ? assetUrl("Generic Potatoes Transparent", p.file) : "";
   const pigeonPotato = p?.socialKind === "pigeon";
+  const emptyInfo = !p ? emptyStageInfo(game) : null;
+  const emptyAction = () => {
+    if (!emptyInfo?.action) return;
+    if (emptyInfo.action === "moveToPile") moveToPile?.();
+    if (emptyInfo.action === "watchAd") setAdModal?.(true);
+  };
 
   useEffect(() => {
     if (!p) {
@@ -3233,20 +3304,16 @@ function PotatoStage({ game, heatScore, coins, babyCry, overdriveBoost, onBadVid
   return (
     <div className={`potato-zone ${p ? "active" : ""}`} style={{ "--heat": heatScore }}>
       {!p && (
-        <div className="empty-stage">
-          {game.connected ? (
-            <>
-              <div className="big">HP</div>
-              <h2>Hands empty</h2>
-              <p>Waiting for a Hot Potato.</p>
-            </>
-          ) : (
-            <>
-              <div className="big">HP</div>
-              <h2>Connect to start</h2>
-              <p>Choose a player, connect, earn Tots, then play.</p>
-            </>
+        <div className={`empty-stage ${emptyInfo?.tone || "waiting"}`}>
+          <div className="big">{emptyInfo?.icon || "HP"}</div>
+          <h2>{emptyInfo?.title || "Hands empty"}</h2>
+          <p>{emptyInfo?.body || "Waiting for a Hot Potato."}</p>
+          {emptyInfo?.action && (
+            <button className="empty-stage-cta" type="button" onClick={emptyAction}>
+              {emptyInfo.actionLabel}
+            </button>
           )}
+          {emptyInfo?.meta && <span className="empty-stage-meta">{emptyInfo.meta}</span>}
         </div>
       )}
       {p && (
