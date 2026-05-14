@@ -208,6 +208,17 @@ function playerDisplayName(player) {
   return player?.name || player?.username || "Player";
 }
 
+function normalizePlayerLookup(value) {
+  return String(value || "").trim().toLowerCase().replace(/^@/, "");
+}
+
+function playerMatchesName(player, name) {
+  const target = normalizePlayerLookup(name);
+  if (!target) return false;
+  return [playerDisplayName(player), player?.name, player?.username, player?.handle, displayHandle(player)]
+    .some((label) => normalizePlayerLookup(label) === target);
+}
+
 function cleanUsername(value) {
   return String(value || "").replace(/[^\w -]/g, "").slice(0, 16);
 }
@@ -1048,6 +1059,7 @@ export default function App() {
   const [badAdFiles, setBadAdFiles] = useState([]);
   const [gearOpen, setGearOpen] = useState(false);
   const [mobileSheet, setMobileSheet] = useState(null);
+  const [replyFocusNonce, setReplyFocusNonce] = useState(0);
   const [realPlayers, setRealPlayers] = useState([]);
   const [playersStatus, setPlayersStatus] = useState("idle");
   const [friendSearch, setFriendSearch] = useState("");
@@ -1058,6 +1070,7 @@ export default function App() {
   const [soundCheckOpen, setSoundCheckOpen] = useState(false);
   const refs = useRef({});
   const coachRef = useRef(null);
+  const messageComposerRef = useRef(null);
   const lastSoundRef = useRef({});
   const holdDroneRef = useRef(null);
   const audioCtxRef = useRef(null);
@@ -1208,6 +1221,15 @@ export default function App() {
     setMobileSheet(null);
     setGearOpen(false);
   }, [adModal]);
+
+  useEffect(() => {
+    if (!replyFocusNonce) return undefined;
+    const timer = setTimeout(() => {
+      messageComposerRef.current?.focus?.();
+      messageComposerRef.current?.scrollIntoView?.({ behavior: "smooth", block: "center" });
+    }, 120);
+    return () => clearTimeout(timer);
+  }, [replyFocusNonce, mobileSheet, gearOpen, game.target, realPlayers.length]);
 
   useEffect(() => {
     if (!game.potato) return;
@@ -1520,8 +1542,8 @@ export default function App() {
     }
   }
 
-  async function searchFriends() {
-    const query = cleanUsername(friendSearch).trim();
+  async function searchFriends(rawQuery = friendSearch) {
+    const query = cleanUsername(rawQuery).trim();
     if (query.length < 2) {
       playSfx("error");
       showToast("Type at least 2 letters.");
@@ -1574,6 +1596,39 @@ export default function App() {
     } catch (error) {
       setFriendSearchStatus("offline");
       showToast(error.message || "Could not add friend.");
+    }
+  }
+
+  function startPigeonReply(message) {
+    const sender = String(message?.from || "").trim();
+    const senderSearch = cleanUsername(sender.replace(/^@/, "")).trim();
+    const friendIndex = realPlayers.findIndex((player) => playerMatchesName(player, sender));
+
+    setMessageReveal(null);
+    setGearOpen(false);
+    setMobileSheet("activity");
+    setGame((old) => ({
+      ...old,
+      target: friendIndex >= 0 ? friendIndex : old.target,
+      unlocked: { ...old.unlocked, activity: true, target: true }
+    }));
+    setMessageDraft((old) => old.trim() ? old : senderSearch ? `Hey ${senderSearch}, ` : "");
+    setReplyFocusNonce((nonce) => nonce + 1);
+
+    if (friendIndex >= 0) {
+      setFriendSearch("");
+      showToast(`Replying to ${playerDisplayName(realPlayers[friendIndex])}.`);
+      return;
+    }
+
+    if (senderSearch.length >= 2) {
+      setFriendSearch(senderSearch);
+      setFriendSearchResults([]);
+      setFriendSearchStatus("loading");
+      showToast(`Find ${senderSearch}, add them, then send a Pigeon Potato.`);
+      void searchFriends(senderSearch);
+    } else {
+      showToast("Add the sender as a friend first, then send a Pigeon Potato.");
     }
   }
 
@@ -2984,6 +3039,7 @@ export default function App() {
             friendSearchStatus={friendSearchStatus}
             searchFriends={searchFriends}
             addFriendFromSearch={addFriendFromSearch}
+            messageComposerRef={messageComposerRef}
             messageDraft={messageDraft}
             setMessageDraft={setMessageDraft}
             sendSocialPotato={sendSocialPotato}
@@ -3051,14 +3107,7 @@ export default function App() {
         <MessagePotatoModal
           message={messageReveal}
           close={() => setMessageReveal(null)}
-          reply={() => {
-            const friendIndex = realPlayers.findIndex((player) => playerDisplayName(player).toLowerCase() === String(messageReveal.from || "").toLowerCase());
-            if (friendIndex >= 0) setGame((old) => ({ ...old, target: friendIndex, unlocked: { ...old.unlocked, activity: true, target: true } }));
-            setFriendSearch(friendIndex >= 0 ? "" : messageReveal.from || "");
-            setMessageReveal(null);
-            setMobileSheet("activity");
-            setGearOpen(false);
-          }}
+          reply={() => startPigeonReply(messageReveal)}
         />
       )}
       {toast && <div className="toast">{toast}</div>}
@@ -3977,6 +4026,7 @@ function ActivityPanel({
   friendSearchStatus,
   searchFriends,
   addFriendFromSearch,
+  messageComposerRef,
   messageDraft,
   setMessageDraft,
   sendSocialPotato,
@@ -4022,6 +4072,7 @@ function ActivityPanel({
               <TargetProfile
                 game={game}
                 target={selectedTarget}
+                messageComposerRef={messageComposerRef}
                 messageDraft={messageDraft}
                 setMessageDraft={setMessageDraft}
                 sendSocialPotato={sendSocialPotato}
@@ -4094,7 +4145,7 @@ function FriendSearch({ query, setQuery, results, status, searchFriends, addFrie
   );
 }
 
-function TargetProfile({ game, target, messageDraft, setMessageDraft, sendSocialPotato }) {
+function TargetProfile({ game, target, messageComposerRef, messageDraft, setMessageDraft, sendSocialPotato }) {
   if (!target) return null;
   const targetName = playerDisplayName(target);
   const spendable = socialSpendable(game);
@@ -4110,6 +4161,7 @@ function TargetProfile({ game, target, messageDraft, setMessageDraft, sendSocial
       </div>
       <div className="pigeon-message-box">
         <textarea
+          ref={messageComposerRef}
           value={messageDraft}
           maxLength={180}
           placeholder={`Write ${targetName} a hidden message`}
