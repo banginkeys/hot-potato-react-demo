@@ -1126,7 +1126,7 @@ small {
   font-size: 0.95rem;
 }
 
-.side-sponsor-break .ad-video-shell {
+.side-sponsor-break .sponsor-reel-shell {
   min-height: 126px;
   border-radius: 16px;
   background:
@@ -2371,13 +2371,13 @@ small {
   font-weight: 1000;
 }
 
-.ad-pace-note {
+.reward-pace-note {
   color: #665474;
   font-size: 0.86rem;
   font-weight: 850;
 }
 
-.ad-frame {
+.sponsor-reel-frame {
   position: relative;
   display: block;
   width: 100%;
@@ -2387,7 +2387,7 @@ small {
   background: #111;
 }
 
-.ad-video-shell {
+.sponsor-reel-shell {
   position: relative;
   width: 100%;
   height: 100%;
@@ -2399,7 +2399,7 @@ small {
     linear-gradient(135deg, #10111d, #251446 58%, #0d5161);
 }
 
-.ad-frame video,
+.sponsor-reel-frame video,
 .risk-ad video {
   width: 100%;
   display: block;
@@ -2407,61 +2407,61 @@ small {
   object-fit: contain;
 }
 
-.rewarded-ad-card {
+.reward-card {
   width: min(640px, calc(100vw - 24px));
   max-height: calc(100dvh - 24px);
   overflow: hidden;
   gap: 0.68rem;
 }
 
-.rewarded-ad-card h2,
-.rewarded-ad-card p {
+.reward-card h2,
+.reward-card p {
   margin: 0;
 }
 
-.rewarded-ad-card .ad-frame {
+.reward-card .sponsor-reel-frame {
   height: clamp(160px, 44dvh, 340px);
   min-height: 0;
   box-shadow: inset 0 0 0 2px rgba(255, 255, 255, 0.12);
 }
 
-.rewarded-ad-card .ad-video-shell {
+.reward-card .sponsor-reel-shell {
   min-height: 0;
 }
 
-.rewarded-ad-card .ad-frame video {
+.reward-card .sponsor-reel-frame video {
   position: absolute;
   inset: 0;
   height: 100%;
 }
 
-.rewarded-ad-card button {
+.reward-card button {
   min-height: 46px;
   padding-block: 0.65rem;
 }
 
 @media (max-height: 560px) {
-  .rewarded-ad-card {
+  .reward-card {
     gap: 0.48rem;
     padding: 0.78rem;
     border-radius: 22px;
   }
 
-  .rewarded-ad-card .ad-frame {
+  .reward-card .sponsor-reel-frame {
     height: clamp(128px, 43dvh, 210px);
   }
 
-  .rewarded-ad-card button {
+  .reward-card button {
     min-height: 40px;
     padding-block: 0.48rem;
   }
 
-  .rewarded-ad-card .ad-pace-note {
+  .reward-card .reward-pace-note {
     display: none;
   }
 }
 
-.ad-video-status {
+.sponsor-reel-status {
   position: absolute;
   inset: 0;
   display: grid;
@@ -2476,11 +2476,11 @@ small {
   pointer-events: none;
 }
 
-.ad-video-shell.playing .ad-video-status {
+.sponsor-reel-shell.playing .sponsor-reel-status {
   display: none;
 }
 
-.ad-placeholder {
+.sponsor-reel-placeholder {
   display: grid;
   place-items: center;
   min-height: 170px;

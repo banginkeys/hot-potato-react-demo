@@ -3635,10 +3635,10 @@ function PlayableAdVideo({ file, soundOn, loop = false, onBadVideo, onVisualRead
     onBadVideo?.(file);
   }
 
-  if (!file) return <div className="ad-placeholder">No ad videos found.</div>;
+  if (!file) return <div className="sponsor-reel-placeholder">No sponsor videos found.</div>;
 
   return (
-    <div className={`ad-video-shell ${loadState}`}>
+    <div className={`sponsor-reel-shell ${loadState}`}>
       <video
         key={file}
         ref={videoRef}
@@ -3655,8 +3655,8 @@ function PlayableAdVideo({ file, soundOn, loop = false, onBadVideo, onVisualRead
         onPlaying={markLoadable}
         onError={markBad}
       />
-      {loadState === "loading" && <div className="ad-video-status">Loading sponsor reel...</div>}
-      {loadState === "failed" && <div className="ad-video-status">Finding another ad...</div>}
+      {loadState === "loading" && <div className="sponsor-reel-status">Loading sponsor reel...</div>}
+      {loadState === "failed" && <div className="sponsor-reel-status">Finding another sponsor...</div>}
     </div>
   );
 }
@@ -4363,10 +4363,10 @@ function AdModal({ game, file, adReady, claimAd, close, onBadVideo }) {
   }, [file]);
 
   return (
-    <div className="modal show rewarded-ad-modal">
-      <div className="modal-card rewarded-ad-card">
+    <div className="modal show reward-modal">
+      <div className="modal-card reward-card">
         <h2>Rewarded Ad</h2>
-        <div className="ad-frame">
+        <div className="sponsor-reel-frame">
           <PlayableAdVideo
             file={file}
             soundOn={game.soundOn}
@@ -4377,7 +4377,7 @@ function AdModal({ game, file, adReady, claimAd, close, onBadVideo }) {
         <p>{canClaim ? "Ad complete." : visualReady ? "Ad playing..." : "Loading sponsor video..."}</p>
         <button className="green" onClick={claimAd} disabled={!canClaim}>Claim +{payout.tots} Tots</button>
         <button className="ghost" onClick={close}>Close</button>
-        <p className="ad-pace-note">Reward pace: {payout.tier}. Fresh ad views pay the most Tots.</p>
+        <p className="reward-pace-note">Reward pace: {payout.tier}. Fresh ad views pay the most Tots.</p>
       </div>
     </div>
   );
